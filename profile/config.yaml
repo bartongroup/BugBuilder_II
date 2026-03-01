@@ -1,0 +1,30 @@
+snakefile: workflow/Snakefile
+software-deployment-method: apptainer
+latency-wait: 60
+show-failed-logs: True
+keep-going: True
+printshellcmds: True
+rerun-incomplete: True
+skip-script-cleanup: True
+jobname: "assembly_{rule}.{jobid}"
+jobs:  200
+## DRMAA plugin config
+executor: drmaa
+drmaa-log-dir: drmaa_logs
+drmaa-args: >
+  -cwd -j y -pe smp {threads}
+## Job Resources
+set-threads:
+  fastp: 4
+  spades: 16
+  bakta: 8
+  busco: 8
+  gtdbtk: 24
+set-resources:
+  spades:
+    mem_mb: 64000
+
+
+default-resources:
+  - threads=1
+  - mem_mb=4000
