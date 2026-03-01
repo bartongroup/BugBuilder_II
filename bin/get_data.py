@@ -6,6 +6,7 @@ Identifies data files from sample_sheet.xlsx for each sample and copy/download a
 from pathlib import Path,PurePosixPath
 import pandas as pd
 from shutil import copy
+import re
 import requests
 
 def download_file(sample_id, url):
@@ -17,8 +18,11 @@ def download_file(sample_id, url):
     url: The URL of the file to download   
     """
 
-    local_filename = Path(f"data/{sample_id}/short_reads/{url.split('/')[-1]}")
-    print("Downloading short read data from:", url) 
+    local_name = url.split('/')[-1]
+    local_name = re.sub(r'^[0-9]+_', '', local_name)
+
+    local_filename = Path(f"data/{sample_id}/short_reads/{local_name}")
+    print("Downloading short read data to:", local_filename) 
     if not local_filename.exists():
         with requests.get(url, stream=True) as r:
             r.raise_for_status()
@@ -60,7 +64,11 @@ def get_data(sample_sheet):
                 fastqs = list(short_1.glob(f"*{sample_id}*.fastq.gz"))
 
             for fastq in fastqs:
-                dest = Path(f'data/{sample_id}/short_reads/{fastq.name}')
+                local_name = fastq.name
+                local_name = re.sub(r'^[0-9]+_', '', local_name)
+                print("local name:", local_name)
+                
+                dest = Path(f'data/{sample_id}/short_reads/{local_name}')
                 if not dest.exists():
                     print(f"Copying short read data: {fastq}")
                     copy(fastq, dest)
