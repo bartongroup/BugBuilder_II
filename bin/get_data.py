@@ -76,10 +76,12 @@ def get_data(sample_sheet):
         if long_read.exists():
             Path(f'data/{sample_id}/long_reads').mkdir(exist_ok=True)
 
-            if Path(long_read).exists():
-                fastq = list(long_read.glob(f"*{sample_id}*.fastq.gz"))[0]
+            fastq = list(long_read.glob(f"*{sample_id}*.fastq.gz"))[0]
+            local_name = fastq.name
+            local_name = re.sub(r'^[0-9L]+_', '', local_name)
+            print("long read local name:", local_name)
 
-            dest = Path(f'data/{sample_id}/long_reads/{fastq.name}')
+            dest = Path(f'data/{sample_id}/long_reads/{local_name}')
             if not dest.exists():
                 print("copying long read data...")
                 copy(fastq, dest) 
