@@ -17,13 +17,13 @@ def get_spades_mode(wildcards, input):
     else:
         return "--careful"
 
-CONDA_PREFIX=os.environ['CONDA_PREFIX']
-BAKTA_DB_PATH="{}/bakta_db/db".format(CONDA_PREFIX)
+CONDA_PREFIX = os.environ['CONDA_PREFIX']
+BAKTA_DB_PATH = "{}/bakta_db/db".format(CONDA_PREFIX)
 
-SAMPLES=glob('data/*')
-SAMPLES=[os.path.basename(x) for x in SAMPLES]
-LONG_SAMPLES=[]
-SHORT_SAMPLES=[]
+SAMPLES = glob('data/*')
+SAMPLES = [os.path.basename(x) for x in SAMPLES]
+LONG_SAMPLES = []
+SHORT_SAMPLES = []
 
 for sample in SAMPLES:
     if os.path.exists(f"data/{sample}/long_reads"):
@@ -67,14 +67,14 @@ print("Samples with short reads:", SHORT_SAMPLES)
 
 #QUASTS=expand("quast/{sample}/report.txt",sample=SAMPLES)
 
-SHORT_ASSEMBLIES=expand("results/assembly/short_assembly/{sample}.fasta",sample=SHORT_SAMPLES)
-LONG_ASSEMBLIES=expand("results/assemby/long_assembly/{sample}.fasta",sample=LONG_SAMPLES)
-ASSEMBLIES=expand("results/assembly/{sample}.fasta",sample=SAMPLES)
+SHORT_ASSEMBLIES = expand("results/assembly/short_assembly/{sample}.fasta",sample=SHORT_SAMPLES)
+LONG_ASSEMBLIES = expand("results/assembly/long_assembly/{sample}.fasta",sample=LONG_SAMPLES)
+ASSEMBLIES = expand("results/assembly/{sample}.fasta",sample=SAMPLES)
 
 #GFAS=expand("assemblies/{sample}/assembly.gfa",sample=SAMPLES)
-MULTIQC_REPORT=['workflow/reports/multiqc_report.html']
+MULTIQC_REPORT = ['workflow/reports/multiqc_report.html']
 
-OUTPUTS=SHORT_ASSEMBLIES + MULTIQC_REPORT
+OUTPUTS = SHORT_ASSEMBLIES + LONG_ASSEMBLIES + MULTIQC_REPORT
 #OUTPUTS=ANNOTS+BANDAGE_IMGS+BUSCOS+QUASTS
 
 rule all:
@@ -96,12 +96,12 @@ rule all:
 
 rule fastp:
     input:
-        fq1='data/{sample}/short_reads/{sample}_1.fastq.gz',
-        fq2='data/{sample}/short_reads/{sample}_2.fastq.gz'
+        fq1 = 'data/{sample}/short_reads/{sample}_1.fastq.gz',
+        fq2 = 'data/{sample}/short_reads/{sample}_2.fastq.gz'
     output:
-        fq1='results/trimmed_short_reads/{sample}_1.fastq.gz',
-        fq2='results/trimmed_short_reads/{sample}_2.fastq.gz',
-        json='results/trimmed_short_reads/{sample}_fastp.json'
+        fq1 = 'results/trimmed_short_reads/{sample}_1.fastq.gz',
+        fq2 = 'results/trimmed_short_reads/{sample}_2.fastq.gz',
+        json = 'results/trimmed_short_reads/{sample}_fastp.json'
     container: "docker://quay.io/biocontainers/fastp:1.1.0--heae3180_0"
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/fastp_{sample}.log'
@@ -120,21 +120,54 @@ rule fastp:
         > {log} 2>&1
     """
 
+rule chopper:
+    input:
+        long_reads = 'data/{sample}/long_reads/{sample}.fastq.gz'
+    output:
+        filtered_reads = 'results/trimmed_long_reads/{sample}.fastq.gz'
+    container: "docker://quay.io/biocontainers/chopper:0.12.0--hcdda2d0_0"
+    threads: 1 # overidden by profile config, but required...
+    params:
+        min_qual = 10,   # Minimum average Phred score
+        min_len = 1000   # Minimum read length (bp)
+    log: 'workflow/logs/chopper_{sample}.log'
+    shell:
+        """
+        gunzip -c {input.long_reads} | \
+        chopper -t {threads} -q {params.min_qual} -l {params.min_len} | \
+        gzip > {output.filtered_reads} 2> {log}
+        """
+
+rule nanostat:
+    input: 'data/{sample}/long_reads/{sample}.fastq.gz'
+    output: 'results/long_read_stats/{sample}_nanostat.txt'
+    container: "docker://quay.io/biocontainers/nanostat:1.6.0--pyhdfd78af_0"
+    log: 'workflow/logs/nanostat_{sample}.log'
+    threads: 1 # overidden by profile config, but required...
+    shell: """
+        NanoStat \
+            --fastq {input} \
+            --name {output} \
+            --threads {threads} \
+            --tsv \
+        > {log} 2>&1
+    """
+
 rule spades:
     input:
-        fq1='results/trimmed_short_reads/{sample}_1.fastq.gz',
-        fq2='results/trimmed_short_reads/{sample}_2.fastq.gz'
+        fq1 = 'results/trimmed_short_reads/{sample}_1.fastq.gz',
+        fq2 = 'results/trimmed_short_reads/{sample}_2.fastq.gz'
     output: 
-        contigs="results/assembly/short_assembly/{sample}.fasta",
-        gfa="results/assembly/short_assembly/{sample}.gfa"
+        contigs = "results/assembly/short_assembly/{sample}.fasta",
+        gfa = "results/assembly/short_assembly/{sample}.gfa"
     container: "docker://simonbrandt/spades:v4.2.0"
     log: 'workflow/logs/spades_{sample}.log'
     threads: 1 # overidden by profile config, but required...
     resources:
-        mem_mb=1 # overidden by profile config, but required...
+        mem_mb = 1 # overidden by profile config, but required...
     params:
         mode = get_spades_mode
-    shell:"""
+    shell: """
         (cp -v {input.fq1} $TMPDIR/{wildcards.sample}_1.fastq.gz &&
         cp -v {input.fq2} $TMPDIR/{wildcards.sample}_2.fastq.gz &&
         spades.py \
@@ -146,51 +179,66 @@ rule spades:
             -o $TMPDIR/spades_output &&
         cp -v $TMPDIR/spades_output/contigs.fasta {output.contigs} &&
         cp -v $TMPDIR/spades_output/assembly_graph_with_scaffolds.gfa {output.gfa} &&
-        ln -f -s {output.contigs} results/assembly/{wildcards.sample}.fasta ) \
+        ln -f -s short_assembly/{wildcards.sample}.fasta results/assembly/{wildcards.sample}.fasta ) \
         > {log} 2>&1 
     """
 
-# rule flye:
-# 	input: "data/{sample}/{sample}.fastq.gz"
-# 	output: "flye_assemblies/{sample}/assembly.fasta"
-# 	params: sample="{sample}"
-# 	shell:"""
-# cp {input} $TMPDIR
-# flye --nano-raw $TMPDIR/{params.sample}.fastq.gz --out-dir flye_assemblies/{params.sample} --threads 16
-# """
+rule flye:
+    input: "results/trimmed_long_reads/{sample}.fastq.gz"
+    output: 
+        assembly = "results/flye/{sample}.fasta",
+        gfa = "results/flye/{sample}.gfa",
+        info = "results/flye/{sample}_assembly_info.txt"
+    container: "docker://quay.io/biocontainers/flye:2.9.6--py311h2de2dd3_0"
+    log: 'workflow/logs/flye_{sample}.log'
+    threads: 1 # overidden by profile config, but required...
+    resources:
+        mem_mb = 1 # overidden by profile config, but required...
+    shell: """
+        (cp -v {input} $TMPDIR &&
+        flye \
+            --nano-hq $TMPDIR/{wildcards.sample}.fastq.gz \
+            --out-dir $TMPDIR/flye \
+            --threads {threads} &&
+        cp -v $TMPDIR/flye/assembly.fasta {output.assembly} &&
+        cp -v $TMPDIR/flye/assembly_graph.gfa {output.gfa} &&
+        cp -v $TMPDIR/flye/assembly_info.txt {output.info} ) \
+        > {log} 2>&1
+    """
 
-# rule unicycler:
-# 	input: 
-# 		run1_fq1='data/{sample}/{sample}_run1_1.fastq.gz',
-# 		run1_fq2='data/{sample}/{sample}_run1_2.fastq.gz',
-# 		run2_fq1='data/{sample}/{sample}_1.fastq.gz',
-# 		run2_fq2='data/{sample}/{sample}_2.fastq.gz',
-# 		long_fq='data/{sample}/{sample}.fastq.gz',
-# 		flye_contigs='flye_assemblies/{sample}/assembly.fasta'
-# 	output: "assemblies/{sample}/assembly.gfa",
-# 			"assemblies/{sample}/assembly.fasta"
-# 	shell:"""
-# SAMPLE=$(basename {input.long_fq}|sed 's/.fastq.gz//')
-
-# mkdir $TMPDIR/reads
-# mkdir -p assemblies/${{SAMPLE}}
-
-# # unicyler doesn't seem to like concatentated gzipped files, so merge then compress...
-# zcat {input.run2_fq1} > $TMPDIR/reads/${{SAMPLE}}_1.fastq
-# zcat {input.run2_fq2} > $TMPDIR/reads/${{SAMPLE}}_2.fastq
-# zcat {input.run1_fq1} >> $TMPDIR/reads/${{SAMPLE}}_1.fastq
-# zcat {input.run1_fq2} >> $TMPDIR/reads/${{SAMPLE}}_2.fastq
-# gzip -v $TMPDIR/reads/*fastq
-# cp -v {input.long_fq} $TMPDIR/reads
-# cp -v {input.flye_contigs} $TMPDIR/reads/flye.fasta
-# ls -l $TMPDIR/reads
-
-# unicycler -1 $TMPDIR/reads/${{SAMPLE}}_1.fastq.gz -2 $TMPDIR/reads/${{SAMPLE}}_2.fastq.gz \
-# 	-l $TMPDIR/reads/${{SAMPLE}}.fastq.gz  --existing_long_read_assembly $TMPDIR/reads/flye.fasta \
-# 	-t 16 --mode bold -o $TMPDIR/output
-
-# cp -Rv $TMPDIR/output/* assemblies/${{SAMPLE}}
-# """
+rule unicycler:
+    input: 
+        short_fq1 = 'results/trimmed_short_reads/{sample}_1.fastq.gz',
+        short_fq2 = 'results/trimmed_short_reads/{sample}_2.fastq.gz',
+        long_fq = 'results/trimmed_long_reads/{sample}.fastq.gz',
+        flye_contigs = 'results/flye/{sample}.fasta'
+    output: 
+        contigs = "results/assembly/long_assembly/{sample}.fasta",
+            gfa = "results/assembly/long_assembly/{sample}.gfa" 
+    container: "docker://quay.io/biocontainers/unicycler:0.5.1--py39h746d604_5"
+    log: 'workflow/logs/unicycler_{sample}.log'
+    threads: 1 # overidden by profile config, but required...
+    resources:
+        mem_mb = 1 # overidden by profile config, but required... 
+    shell:"""
+        ( mkdir $TMPDIR/reads &&
+        cp -v {input.short_fq1} $TMPDIR/reads/{wildcards.sample}_1.fastq.gz &&
+        cp -v {input.short_fq2} $TMPDIR/reads/{wildcards.sample}_2.fastq.gz &&
+        cp -v {input.long_fq} $TMPDIR/reads/{wildcards.sample}.fastq.gz &&
+        cp -v {input.flye_contigs} $TMPDIR/reads/flye.fasta &&
+        unicycler \
+            -1 $TMPDIR/reads/{wildcards.sample}_1.fastq.gz \
+            -2 $TMPDIR/reads/{wildcards.sample}_2.fastq.gz \
+            -l $TMPDIR/reads/{wildcards.sample}.fastq.gz \
+            --existing_long_read_assembly $TMPDIR/reads/flye.fasta \
+            -t {threads} \
+            --mode bold \
+            -o $TMPDIR/output &&
+        cp -v $TMPDIR/output/assembly.fasta {output.contigs} &&
+        cp -v $TMPDIR/output/assembly.gfa {output.gfa} &&
+        ln -f -s long_assembly/{wildcards.sample}.fasta results/assembly/{wildcards.sample}.fasta ) \
+        > {log} 2>&1
+    """
 
 # rule annotate:
 # 	input: 
@@ -257,14 +305,16 @@ rule spades:
 
 rule multiqc:
     input:
-        expand('data/{sample}/trimmed_short_reads/{sample}_fastp.json', sample=SAMPLES)
+        expand('results/trimmed_short_reads/{sample}_fastp.json', sample=SAMPLES) +
+        expand('results/long_read_stats/{sample}_nanostat.txt', sample=LONG_SAMPLES)
     output:
         'workflow/reports/multiqc_report.html'
-    container: "docker://quay.io/biocontainers/multiqc:1.14--pyhdfd78af_0"
+    container: "docker://quay.io/biocontainers/multiqc:1.33--pyhdfd78af_0"
     log: 'workflow/logs/multiqc.log'
     shell:
         """
-        multiqc data/ \
+        multiqc results \
+                --config etc/multiqc.conf \
                 --outdir workflow/reports/ \
                 --filename multiqc_report.html \
                 --force > {log} 2>&1

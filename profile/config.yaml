@@ -16,13 +16,21 @@ drmaa-args: >
 ## Job Resources
 set-threads:
   fastp: 4
+  chopper: 4
+  nanostat: 4
   spades: 16
+  flye: 16
+  unicycler: 16
   bakta: 8
   busco: 8
   gtdbtk: 24
 set-resources:
   spades:
     mem_mb: 64000
+  flye:
+    mem_mb: 24000
+  unicycler:
+    mem_mb: 32000
 
 
 default-resources:
