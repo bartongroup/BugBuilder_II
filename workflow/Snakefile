@@ -194,11 +194,15 @@ rule flye:
     threads: 1 # overidden by profile config, but required...
     resources:
         mem_mb = 1 # overidden by profile config, but required...
+    params:
+        genome_size = genome_size
     shell: """
         (cp -v {input} $TMPDIR &&
         flye \
             --nano-hq $TMPDIR/{wildcards.sample}.fastq.gz \
             --out-dir $TMPDIR/flye \
+            --genome-size {params.genome_size} \
+            --asm-coverage 50 \
             --threads {threads} &&
         cp -v $TMPDIR/flye/assembly.fasta {output.assembly} &&
         cp -v $TMPDIR/flye/assembly_graph.gfa {output.gfa} &&
