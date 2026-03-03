@@ -1,0 +1,14 @@
+name: microbial_assembly
+channels:
+  - bioconda
+  - conda-forge
+  - nvidia
+dependencies:
+  - snakemake-executor-plugin-drmaa
+  - snakemake
+  - requests
+  - pandas
+  - drmaa
+  - openpyxl
+  - beautifulsoup4
+  - lxml

@@ -10,6 +10,24 @@ import os
 
 genome_size = 5_000_000 # 5 Mbp, typical for Bacillus subtilis, and median-ish for Bacillus as a whole
 gram = '+' # default to gram positive, used for bakta annotation
+busco_lineage = 'bacillales_odb10'
+gtdb_version = '226'
+
+################################################################################
+#
+# Containers...
+#
+################################################################################
+
+fastp_container = "docker://quay.io/biocontainers/fastp:1.1.0--heae3180_0"
+chopper_container = "docker://quay.io/biocontainers/chopper:0.12.0--hcdda2d0_0"
+nanostat_container = "docker://quay.io/biocontainers/nanostat:1.6.0--pyhdfd78af_0"
+spades_container = "docker://simonbrandt/spades:v4.2.0"
+flye_container = "docker://quay.io/biocontainers/flye:2.9.6--py311h2de2dd3_0"
+unicycler_container = "docker://quay.io/biocontainers/unicycler:0.5.1--py39h746d604_5"
+bakta_container = "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
+gtdbtk_container =  "docker://quay.io/biocontainers/gtdbtk:2.6.1--pyh1f0d9b5_2"
+multiqc_container = "docker://quay.io/biocontainers/multiqc:1.33--pyhdfd78af_0"
 
 ################################################################################
 #
@@ -83,6 +101,10 @@ BAKTA_DB = (
 
 AMRFINDER_DB=f'{BAKTA_DB_PATH}/amrfinderplus-db/latest/version.txt'
 
+# Way too many files in GTDB to list them all, so just one as a target
+GTDB = ['databases/gtdbtk/taxonomy/gtdb_taxonomy.tsv']
+GTDBTK = ['results/gtdbtk/gtdbtk.bac120.summary.tsv']
+
 ################################################################################
 # 
 # Define outputs...
@@ -113,7 +135,7 @@ ANNOTS = expand(
 
 MULTIQC_REPORT = ['workflow/reports/multiqc_report.html']
 
-OUTPUTS = ANNOTS + MULTIQC_REPORT
+OUTPUTS = ANNOTS + GTDBTK + MULTIQC_REPORT
 #OUTPUTS=ANNOTS+BANDAGE_IMGS+BUSCOS+QUASTS
 
 ################################################################################
@@ -127,7 +149,7 @@ rule all:
 
 rule bakta_download:
     output: BAKTA_DB
-    container: "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
+    container: bakta_container
     shell:"""
 mkdir -p databases/bakta_db
 bakta_db download --output databases/bakta_db
@@ -136,9 +158,20 @@ bakta_db download --output databases/bakta_db
 rule amdfinder_download:
     input: BAKTA_DB
     output: AMRFINDER_DB	
-    container: "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
+    container: bakta_container
     shell:"""
     amrfinder_update --database databases/bakta_db/db/amrfinderplus-db/
+"""
+
+rule gtdb_download:
+    output: GTDB
+    params:
+        gtdb_version = gtdb_version
+    log: 'workflow/logs/gtdb_download.log'
+    shell: """
+bin/download_gtdbtk_db.py \
+  --release {params.gtdb_version} \
+  > {log} 2>&1
 """
 
 rule fastp:
@@ -149,7 +182,7 @@ rule fastp:
         fq1 = 'results/trimmed_short_reads/{sample}_1.fastq.gz',
         fq2 = 'results/trimmed_short_reads/{sample}_2.fastq.gz',
         json = 'results/trimmed_short_reads/{sample}_fastp.json'
-    container: "docker://quay.io/biocontainers/fastp:1.1.0--heae3180_0"
+    container: fastp_container
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/fastp_{sample}.log'
     shell: """
@@ -172,7 +205,7 @@ rule chopper:
         long_reads = 'data/{sample}/long_reads/{sample}.fastq.gz'
     output:
         filtered_reads = 'results/trimmed_long_reads/{sample}.fastq.gz'
-    container: "docker://quay.io/biocontainers/chopper:0.12.0--hcdda2d0_0"
+    container: chopper_container
     threads: 1 # overidden by profile config, but required...
     params:
         min_qual = 10,   # Minimum average Phred score
@@ -188,7 +221,7 @@ rule chopper:
 rule nanostat:
     input: 'data/{sample}/long_reads/{sample}.fastq.gz'
     output: 'results/long_read_stats/{sample}_nanostat.txt'
-    container: "docker://quay.io/biocontainers/nanostat:1.6.0--pyhdfd78af_0"
+    container: nanostat_container
     log: 'workflow/logs/nanostat_{sample}.log'
     threads: 1 # overidden by profile config, but required...
     shell: """
@@ -207,7 +240,7 @@ rule spades:
     output: 
         contigs = "results/assembly/short_assembly/{sample}.fasta",
         gfa = "results/assembly/short_assembly/{sample}.gfa"
-    container: "docker://simonbrandt/spades:v4.2.0"
+    container: spades_container
     log: 'workflow/logs/spades_{sample}.log'
     threads: 1 # overidden by profile config, but required...
     resources:
@@ -236,7 +269,7 @@ rule flye:
         assembly = "results/flye/{sample}.fasta",
         gfa = "results/flye/{sample}.gfa",
         info = "results/flye/{sample}_assembly_info.txt"
-    container: "docker://quay.io/biocontainers/flye:2.9.6--py311h2de2dd3_0"
+    container: flye_container
     log: 'workflow/logs/flye_{sample}.log'
     threads: 1 # overidden by profile config, but required...
     resources:
@@ -266,7 +299,7 @@ rule unicycler:
     output: 
         contigs = "results/assembly/long_assembly/{sample}.fasta",
             gfa = "results/assembly/long_assembly/{sample}.gfa" 
-    container: "docker://quay.io/biocontainers/unicycler:0.5.1--py39h746d604_5"
+    container: unicycler_container
     log: 'workflow/logs/unicycler_{sample}.log'
     threads: 1 # overidden by profile config, but required...
     resources:
@@ -298,7 +331,7 @@ rule bakta:
     output:
         multiext("results/annotated/{sample}/{sample}",'.tsv','.gff3',
             '.gbff','.embl','.fna','.ffn','.faa','.hypotheticals.tsv','.txt','.json')
-    container: "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
+    container: bakta_container
     log: 'workflow/logs/bakta_{sample}.log'
     params:
         gram=gram
@@ -315,6 +348,29 @@ rule bakta:
         --gram {params.gram} \
         --force \
         {input.contigs} > {log} 2>&1
+"""
+
+rule gtdbtk:
+    input:
+        assemblies = LONG_ASSEMBLIES + SHORT_ASSEMBLIES,
+        database = GTDB
+    output:
+        "results/gtdbtk/gtdbtk.bac120.summary.tsv"
+    container: gtdbtk_container
+    threads: 1 # overidden by profile config, but required...
+    log: 'workflow/logs/gtdbtk.log'
+    shell: """
+export GTDBTK_DATA_PATH="databases/gtdbtk"
+gtdbtk classify_wf \
+        --skip_ani_screen \
+        --genome_dir results/assembly \
+        --out_dir results/gtdbtk/ \
+        -x fasta \
+        --cpus {threads} \
+        --pplacer_cpus {threads} \
+        --tmpdir $TMPDIR \
+        --force \
+        > {log} 2>&1
 """
 
 # rule bandage:
@@ -369,11 +425,13 @@ rule bakta:
 
 rule multiqc:
     input:
-        expand('results/trimmed_short_reads/{sample}_fastp.json', sample=SAMPLES) +
-        expand('results/long_read_stats/{sample}_nanostat.txt', sample=LONG_SAMPLES)
+        files = expand('results/trimmed_short_reads/{sample}_fastp.json', sample=SAMPLES) +
+                expand('results/long_read_stats/{sample}_nanostat.txt', sample=LONG_SAMPLES) +
+                ANNOTS + GTDBTK,
+        config = 'etc/multiqc.conf'
     output:
         'workflow/reports/multiqc_report.html'
-    container: "docker://quay.io/biocontainers/multiqc:1.33--pyhdfd78af_0"
+    container: multiqc_container
     log: 'workflow/logs/multiqc.log'
     shell:
         """
