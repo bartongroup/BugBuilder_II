@@ -2,6 +2,7 @@ from glob import glob
 import os
 
 genome_size = 5_000_000 # 5 Mbp, typical for Bacillus subtilis, and median-ish for Bacillus as a whole
+gram = '+' # default to gram positive, used for bakta annotation
 
 def get_spades_mode(wildcards, input):
     """
@@ -17,8 +18,12 @@ def get_spades_mode(wildcards, input):
     else:
         return "--careful"
 
-CONDA_PREFIX = os.environ['CONDA_PREFIX']
-BAKTA_DB_PATH = "{}/bakta_db/db".format(CONDA_PREFIX)
+# Each sample should be in a subdirectory of 'data/' named with the sample id,
+# and containing 'short_reads/' and/or 'long_reads/' subdirectories with the
+# appropriate FASTQ files.
+
+# Filenaming should start with the sample id, and end with '_1.fastq.gz' and
+# '_2.fastq.gz' for short reads, and '{sample}.fastq.gz' for long reads.
 
 SAMPLES = glob('data/*')
 SAMPLES = [os.path.basename(x) for x in SAMPLES]
@@ -34,32 +39,45 @@ for sample in SAMPLES:
 print("Samples with long reads:", LONG_SAMPLES)
 print("Samples with short reads:", SHORT_SAMPLES)
 
+BAKTA_DB_PATH = "databases/bakta_db/db"
 
-# BAKTA_DB=multiext('{}/antifam'.format(BAKTA_DB_PATH),'.h3f','.h3i','.h3m','.h3p') + \
-# 		multiext('{}/ncRNA-genes'.format(BAKTA_DB_PATH),'.i1i','.i1f','.i1m','.i1p') + \
-# 		multiext('{}/ncRNA-regions'.format(BAKTA_DB_PATH),'.i1i','.i1f','.i1m','.i1p') + \
-# 		multiext('{}/rRNA'.format(BAKTA_DB_PATH),'.i1i','.i1f','.i1m','.i1p') + \
-# 		multiext('{}/pfam'.format(BAKTA_DB_PATH),'.h3f','.h3i','.h3m','.h3p') + \
-# 		['{}/bakta.db'.format(BAKTA_DB_PATH), \
-# 		'{}/expert-protein-sequences.dmnd'.format(BAKTA_DB_PATH),\
-# 		'{}/sorf.dmnd'.format(BAKTA_DB_PATH), \
-# 		'{}/oric.fna'.format(BAKTA_DB_PATH), \
-# 		'{}/orit.fna'.format(BAKTA_DB_PATH), \
-# 		'{}/rfam-go.tsv'.format(BAKTA_DB_PATH), \
-# 		'{}/version.json'.format(BAKTA_DB_PATH)]
+# Bakta database consists of multiple files with different extensions depending on the type of data
+DB_MAP = {
+    "hmmer": (["antifam", "pfam"], [".h3f", ".h3i", ".h3m", ".h3p"]),
+    "infernal": (["ncRNA-genes", "ncRNA-regions", "rRNA"], [".i1i", ".i1f", ".i1m", ".i1p"]),
+    "singletons": [
+        "bakta.db", "expert-protein-sequences.dmnd", "sorf.dmnd", 
+        "oric.fna", "orit.fna", "rfam-go.tsv", "version.json"
+    ]
+}
 
-# AMRFINDER_DB='{}/amrfinderplus-db/latest/version.txt'.format(BAKTA_DB_PATH)
+BAKTA_DB = (
+    [f"{BAKTA_DB_PATH}/{p}{ext}" for p, exts in [DB_MAP["hmmer"], DB_MAP["infernal"]] for p in p for ext in exts] +
+    [f"{BAKTA_DB_PATH}/{f}" for f in DB_MAP["singletons"]]
+)
 
-# ANNOTS=expand("annotated/{sample}/{sample}.tsv",sample=SAMPLES)+ \
-# 		expand("annotated/{sample}/{sample}.gff3",sample=SAMPLES)+ \
-# 		expand("annotated/{sample}/{sample}.gbff",sample=SAMPLES)+ \
-# 		expand("annotated/{sample}/{sample}.embl",sample=SAMPLES)+ \
-# 		expand("annotated/{sample}/{sample}.fna",sample=SAMPLES)+ \
-# 		expand("annotated/{sample}/{sample}.ffn",sample=SAMPLES)+ \
-# 		expand("annotated/{sample}/{sample}.faa",sample=SAMPLES)+ \
-# 		expand("annotated/{sample}/{sample}.hypotheticals.tsv",sample=SAMPLES)+ \
-# 		expand("annotated/{sample}/{sample}.txt",sample=SAMPLES)+ \
-# 		expand("annotated/{sample}/{sample}.json",sample=SAMPLES)
+# BAKTA_DB=multiext(f'{BAKTA_DB_PATH}/antifam','.h3f','.h3i','.h3m','.h3p') + \
+#          multiext(f'{BAKTA_DB_PATH}/ncRNA-genes','.i1i','.i1f','.i1m','.i1p') + \
+#          multiext(f'{BAKTA_DB_PATH}/ncRNA-regions','.i1i','.i1f','.i1m','.i1p') + \
+#          multiext(f'{BAKTA_DB_PATH}/rRNA','.i1i','.i1f','.i1m','.i1p') + \
+#          multiext(f'{BAKTA_DB_PATH}/pfam','.h3f','.h3i','.h3m','.h3p') + \
+#          [f'{BAKTA_DB_PATH}/bakta.db', \
+#          f'{BAKTA_DB_PATH}/expert-protein-sequences.dmnd', \
+#          f'{BAKTA_DB_PATH}/sorf.dmnd', \
+#          f'{BAKTA_DB_PATH}/oric.fna', \
+#          f'{BAKTA_DB_PATH}/orit.fna', \
+#          f'{BAKTA_DB_PATH}/rfam-go.tsv', \
+#          f'{BAKTA_DB_PATH}/version.json' ]
+
+AMRFINDER_DB=f'{BAKTA_DB_PATH}/amrfinderplus-db/latest/version.txt'
+
+ANNOT_EXTS = ['.tsv', '.gff3', '.gbff', '.embl', '.fna', 
+              '.ffn', '.faa', '.hypotheticals.tsv', '.txt', '.json']
+ANNOTS = expand(
+    "results/annotated/{sample}/{sample}{ext}", 
+    sample=SAMPLES, 
+    ext=ANNOT_EXTS
+)
 
 #BANDAGE_IMGS=expand("assembly_viz/{sample}.png",sample=SAMPLES)
 
@@ -69,30 +87,32 @@ print("Samples with short reads:", SHORT_SAMPLES)
 
 SHORT_ASSEMBLIES = expand("results/assembly/short_assembly/{sample}.fasta",sample=SHORT_SAMPLES)
 LONG_ASSEMBLIES = expand("results/assembly/long_assembly/{sample}.fasta",sample=LONG_SAMPLES)
-ASSEMBLIES = expand("results/assembly/{sample}.fasta",sample=SAMPLES)
+ASSEMBLIES = SHORT_ASSEMBLIES + LONG_ASSEMBLIES
 
 #GFAS=expand("assemblies/{sample}/assembly.gfa",sample=SAMPLES)
 MULTIQC_REPORT = ['workflow/reports/multiqc_report.html']
 
-OUTPUTS = SHORT_ASSEMBLIES + LONG_ASSEMBLIES + MULTIQC_REPORT
+OUTPUTS = ANNOTS + MULTIQC_REPORT
 #OUTPUTS=ANNOTS+BANDAGE_IMGS+BUSCOS+QUASTS
 
 rule all:
     input: OUTPUTS
 
-# rule bakta_download:
-# 	output: BAKTA_DB
-# 	shell:"""
-# mkdir -p ${{CONDA_PREFIX}}/bakta_db
-# bakta_db download --output ${{CONDA_PREFIX}}/bakta_db
-# """
+rule bakta_download:
+    output: BAKTA_DB
+    container: "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
+    shell:"""
+mkdir -p databases/bakta_db
+bakta_db download --output databases/bakta_db
+"""
 
-# rule amdfinder_download:
-# 	input: BAKTA_DB
-# 	output: AMRFINDER_DB	
-# 	shell:"""
-# 	amrfinder_update --database ${{CONDA_PREFIX}}/bakta_db/db/amrfinderplus-db/
-# """
+rule amdfinder_download:
+    input: BAKTA_DB
+    output: AMRFINDER_DB	
+    container: "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
+    shell:"""
+    amrfinder_update --database databases/bakta_db/db/amrfinderplus-db/
+"""
 
 rule fastp:
     input:
@@ -244,18 +264,31 @@ rule unicycler:
         > {log} 2>&1
     """
 
-# rule annotate:
-# 	input: 
-# 		contigs="assemblies/{sample}/assembly.fasta",
-# 		db=AMRFINDER_DB
-# 	params:
-# 		sample="{sample}"
-# 	output:
-# 		multiext("annotated/{sample}/{sample}",'.tsv','.gff3','.gbff','.embl','.fna','.ffn','.faa','.hypotheticals.tsv','.txt','.json')
-# 	shell:"""
-# bakta --db ${{CONDA_PREFIX}}/bakta_db/db --prefix {params.sample} --output annotated/{params.sample} --threads 16 \
-# 	--genus Bacillus --species subtilis --strain {params.sample} --compliant {input.contigs} --locus-tag {params.sample}
-# """
+rule bakta:
+    input: 
+        contigs="results/assembly/{sample}.fasta",
+        db=AMRFINDER_DB
+    output:
+        multiext("results/annotated/{sample}/{sample}",'.tsv','.gff3',
+            '.gbff','.embl','.fna','.ffn','.faa','.hypotheticals.tsv','.txt','.json')
+    container: "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
+    log: 'workflow/logs/bakta_{sample}.log'
+    params:
+        gram=gram
+    threads: 1 # overidden by profile config, but required...
+    shell:"""
+        bakta \
+        --db databases/bakta_db/db \
+        --prefix {wildcards.sample} \
+        --output results/annotated/{wildcards.sample} \
+        --threads {threads} \
+        --complete \
+        --compliant \
+        --locus-tag {wildcards.sample} \
+        --gram {params.gram} \
+        --force \
+        {input.contigs} > {log} 2>&1
+"""
 
 # rule bandage:
 # 	input: GFAS

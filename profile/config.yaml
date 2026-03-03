@@ -21,7 +21,7 @@ set-threads:
   spades: 16
   flye: 16
   unicycler: 16
-  bakta: 8
+  bakta: 16
   busco: 8
   gtdbtk: 24
 set-resources:
