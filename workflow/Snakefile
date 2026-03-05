@@ -10,7 +10,6 @@ import os
 
 genome_size = 5_000_000 # 5 Mbp, typical for Bacillus subtilis, and median-ish for Bacillus as a whole
 gram = '+' # default to gram positive, used for bakta annotation
-busco_lineage = 'bacillales_odb10'
 gtdb_version = '226'
 
 ################################################################################
@@ -27,6 +26,7 @@ flye_container = "docker://quay.io/biocontainers/flye:2.9.6--py311h2de2dd3_0"
 unicycler_container = "docker://quay.io/biocontainers/unicycler:0.5.1--py39h746d604_5"
 bakta_container = "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
 gtdbtk_container =  "docker://quay.io/biocontainers/gtdbtk:2.6.1--pyh1f0d9b5_2"
+busco_container = "docker://ezlabgva/busco:v6.0.0_cv1"
 multiqc_container = "docker://quay.io/biocontainers/multiqc:1.33--pyhdfd78af_0"
 
 ################################################################################
@@ -101,6 +101,8 @@ BAKTA_DB = (
 
 AMRFINDER_DB=f'{BAKTA_DB_PATH}/amrfinderplus-db/latest/version.txt'
 
+BUSCO_DB = "databases/busco_lineages/download.complete"
+
 # Way too many files in GTDB to list them all, so just one as a target
 GTDB = ['databases/gtdbtk/taxonomy/gtdb_taxonomy.tsv']
 GTDBTK = ['results/gtdbtk/gtdbtk.bac120.summary.tsv']
@@ -123,8 +125,8 @@ ANNOTS = expand(
     ext=ANNOT_EXTS
 )
 
-
-#BUSCOS=expand("busco/{sample}/short_summary.specific.bacillales_odb10.{sample}.txt",sample=SAMPLES)
+BUSCOS=expand("results/busco/{sample}.short_summary.txt",
+    sample=SAMPLES)
 
 #QUASTS=expand("quast/{sample}/report.txt",sample=SAMPLES)
 
@@ -135,7 +137,7 @@ ANNOTS = expand(
 
 MULTIQC_REPORT = ['workflow/reports/multiqc_report.html']
 
-OUTPUTS = ANNOTS + GTDBTK + MULTIQC_REPORT
+OUTPUTS = ANNOTS + GTDBTK + BUSCOS + MULTIQC_REPORT
 #OUTPUTS=ANNOTS+BANDAGE_IMGS+BUSCOS+QUASTS
 
 ################################################################################
@@ -172,6 +174,14 @@ rule gtdb_download:
 bin/download_gtdbtk_db.py \
   --release {params.gtdb_version} \
   > {log} 2>&1
+"""
+
+rule busco_download:
+    output: BUSCO_DB
+    log: 'workflow/logs/busco_download.log'
+    shell: """
+    bin/download_busco_lineages.py > {log} 2>&1
+    touch {output}
 """
 
 rule fastp:
@@ -373,6 +383,33 @@ gtdbtk classify_wf \
         > {log} 2>&1
 """
 
+rule busco:
+    input: 
+        assembly = get_assembly_path,
+        database = "databases/busco_lineages/download.complete"
+    output: "results/busco/{sample}.short_summary.txt"
+    container: busco_container
+    threads: 1 # overidden by profile config, but required...
+    log: 'workflow/logs/busco_{sample}.log'
+    params:
+        lineage=busco_lineage
+    shell: """
+    cp -v {input.assembly} $TMPDIR/assembly.fasta 
+    current_dir=$(pwd) 
+    cd $TMPDIR
+    busco -m genome \
+        -c {threads} \
+        --auto-lineage-prok \
+        --download_path $current_dir/databases/busco_lineages \
+        --out_path $TMPDIR \
+        --offline \
+        -o {wildcards.sample} \
+        -i assembly.fasta \
+        -f >> $current_dir/{log} 2>&1
+        result=$(ls -rt $TMPDIR/{wildcards.sample}/*.txt|tail -1)
+        cp -v $result $current_dir/{output} >> $current_dir/{log} 2>&1
+"""
+
 # rule bandage:
 # 	input: GFAS
 # 	output: BANDAGE_IMGS
@@ -389,15 +426,7 @@ gtdbtk classify_wf \
 # done
 # """
 
-# rule busco:
-# 	input: "assemblies/{sample}/assembly.fasta"
-# 	output: "busco/{sample}/short_summary.specific.bacillales_odb10.{sample}.txt"
-# 	params:
-# 		sample="{sample}"
-# 	conda: "busco.yaml"
-# 	shell: """
-# 	busco -m genome -l bacillales_odb10  -o busco/{params.sample} -i {input} -f
-# """
+
 
 # rule quast:
 # 	input: 
@@ -427,7 +456,7 @@ rule multiqc:
     input:
         files = expand('results/trimmed_short_reads/{sample}_fastp.json', sample=SAMPLES) +
                 expand('results/long_read_stats/{sample}_nanostat.txt', sample=LONG_SAMPLES) +
-                ANNOTS + GTDBTK,
+                ANNOTS + GTDBTK + BUSCOS,
         config = 'etc/multiqc.conf'
     output:
         'workflow/reports/multiqc_report.html'
