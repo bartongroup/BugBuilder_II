@@ -115,7 +115,6 @@ GTDBTK = ['results/gtdbtk/gtdbtk.bac120.summary.tsv']
 
 SHORT_ASSEMBLIES = expand("results/assembly/short_assembly/{sample}.fasta",sample=SHORT_SAMPLES)
 LONG_ASSEMBLIES = expand("results/assembly/long_assembly/{sample}.fasta",sample=LONG_SAMPLES)
-ASSEMBLIES = SHORT_ASSEMBLIES + LONG_ASSEMBLIES
 
 ANNOT_EXTS = ['.tsv', '.gff3', '.gbff', '.embl', '.fna', 
               '.ffn', '.faa', '.hypotheticals.tsv', '.txt', '.json']
@@ -137,7 +136,7 @@ BUSCOS=expand("results/busco/{sample}.short_summary.txt",
 
 MULTIQC_REPORT = ['workflow/reports/multiqc_report.html']
 
-OUTPUTS = ANNOTS + GTDBTK + BUSCOS + MULTIQC_REPORT
+OUTPUTS = ANNOTS + MULTIQC_REPORT
 #OUTPUTS=ANNOTS+BANDAGE_IMGS+BUSCOS+QUASTS
 
 ################################################################################
@@ -269,7 +268,6 @@ rule spades:
             -o $TMPDIR/spades_output &&
         cp -v $TMPDIR/spades_output/contigs.fasta {output.contigs} &&
         cp -v $TMPDIR/spades_output/assembly_graph_with_scaffolds.gfa {output.gfa} &&
-        ln -f -s short_assembly/{wildcards.sample}.fasta results/assembly/{wildcards.sample}.fasta ) \
         > {log} 2>&1 
     """
 
@@ -330,7 +328,6 @@ rule unicycler:
             -o $TMPDIR/output &&
         cp -v $TMPDIR/output/assembly.fasta {output.contigs} &&
         cp -v $TMPDIR/output/assembly.gfa {output.gfa} &&
-        ln -f -s long_assembly/{wildcards.sample}.fasta results/assembly/{wildcards.sample}.fasta ) \
         > {log} 2>&1
     """
 
