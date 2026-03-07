@@ -20,10 +20,11 @@ set-threads:
   nanostat: 4
   spades: 16
   flye: 16
-  unicycler: 16
+  unicycler: 32
   bakta: 16
   busco: 8
   gtdbtk: 24
+  quast: 16
 set-resources:
   spades:
     mem_mb: 64000

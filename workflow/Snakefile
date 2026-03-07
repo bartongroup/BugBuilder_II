@@ -19,6 +19,7 @@ gtdb_version = '226'
 ################################################################################
 
 fastp_container = "docker://quay.io/biocontainers/fastp:1.1.0--heae3180_0"
+fastqc_container = "docker://quay.io/biocontainers/fastqc:0.12.1--hdfd78af_0"
 chopper_container = "docker://quay.io/biocontainers/chopper:0.12.0--hcdda2d0_0"
 nanostat_container = "docker://quay.io/biocontainers/nanostat:1.6.0--pyhdfd78af_0"
 spades_container = "docker://simonbrandt/spades:v4.2.0"
@@ -27,6 +28,7 @@ unicycler_container = "docker://quay.io/biocontainers/unicycler:0.5.1--py39h746d
 bakta_container = "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
 gtdbtk_container =  "docker://quay.io/biocontainers/gtdbtk:2.6.1--pyh1f0d9b5_2"
 busco_container = "docker://ezlabgva/busco:v6.0.0_cv1"
+quast_container = "docker://quay.io/biocontainers/quast:5.3.0--py313pl5321h5ca1c30_2"
 multiqc_container = "docker://quay.io/biocontainers/multiqc:1.33--pyhdfd78af_0"
 
 ################################################################################
@@ -123,12 +125,14 @@ ANNOTS = expand(
     sample=SAMPLES, 
     ext=ANNOT_EXTS
 )
-
+FASTQC_OUTPUTS = expand("results/fastqc/{sample}_{read}_fastqc.zip",
+    sample=SAMPLES,
+    read=[1,2]
+)
 BUSCOS=expand("results/busco/{sample}.short_summary.txt",
     sample=SAMPLES)
 
-#QUASTS=expand("quast/{sample}/report.txt",sample=SAMPLES)
-
+QUASTS=expand("results/quast/{sample}/report.txt",sample=SAMPLES)
 
 #GFAS=expand("assemblies/{sample}/assembly.gfa",sample=SAMPLES)
 
@@ -136,7 +140,7 @@ BUSCOS=expand("results/busco/{sample}.short_summary.txt",
 
 MULTIQC_REPORT = ['workflow/reports/multiqc_report.html']
 
-OUTPUTS = ANNOTS + MULTIQC_REPORT
+OUTPUTS = ANNOTS + BUSCOS + MULTIQC_REPORT
 #OUTPUTS=ANNOTS+BANDAGE_IMGS+BUSCOS+QUASTS
 
 ################################################################################
@@ -156,7 +160,7 @@ mkdir -p databases/bakta_db
 bakta_db download --output databases/bakta_db
 """
 
-rule amdfinder_download:
+rule amrfinder_download:
     input: BAKTA_DB
     output: AMRFINDER_DB	
     container: bakta_container
@@ -183,6 +187,23 @@ rule busco_download:
     touch {output}
 """
 
+rule fastqc:
+    input:
+        fq1 = 'data/{sample}/short_reads/{sample}_1.fastq.gz',
+        fq2 = 'data/{sample}/short_reads/{sample}_2.fastq.gz'
+    output:
+        fq1 = 'results/fastqc/{sample}_1_fastqc.zip',
+        fq2 = 'results/fastqc/{sample}_2_fastqc.zip'
+    container: fastqc_container
+    log: 'workflow/logs/fastqc_{sample}.log'
+    shell: """
+        fastqc \
+            -o results/fastqc/ \
+            {input.fq1} \
+            {input.fq2} \
+        > {log} 2>&1
+    """
+
 rule fastp:
     input:
         fq1 = 'data/{sample}/short_reads/{sample}_1.fastq.gz',
@@ -205,7 +226,6 @@ rule fastp:
             --thread {threads} \
             --disable_quality_filtering \
             --disable_length_filtering \
-            --disable_trim_poly_g \
         > {log} 2>&1
     """
 
@@ -267,7 +287,7 @@ rule spades:
             -m {resources.mem_mb} \
             -o $TMPDIR/spades_output &&
         cp -v $TMPDIR/spades_output/contigs.fasta {output.contigs} &&
-        cp -v $TMPDIR/spades_output/assembly_graph_with_scaffolds.gfa {output.gfa} &&
+        cp -v $TMPDIR/spades_output/assembly_graph_with_scaffolds.gfa {output.gfa} ) \
         > {log} 2>&1 
     """
 
@@ -327,7 +347,7 @@ rule unicycler:
             --mode bold \
             -o $TMPDIR/output &&
         cp -v $TMPDIR/output/assembly.fasta {output.contigs} &&
-        cp -v $TMPDIR/output/assembly.gfa {output.gfa} &&
+        cp -v $TMPDIR/output/assembly.gfa {output.gfa} ) \
         > {log} 2>&1
     """
 
@@ -388,8 +408,6 @@ rule busco:
     container: busco_container
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/busco_{sample}.log'
-    params:
-        lineage=busco_lineage
     shell: """
     cp -v {input.assembly} $TMPDIR/assembly.fasta 
     current_dir=$(pwd) 
@@ -423,37 +441,44 @@ rule busco:
 # done
 # """
 
+rule quast:
+    input: 
+        short_fq1 = 'results/trimmed_short_reads/{sample}_1.fastq.gz',
+        short_fq2 = 'results/trimmed_short_reads/{sample}_2.fastq.gz',
+        assembly=get_assembly_path
+    output: "results/quast/{sample}/report.txt"
+    params:
+        long_fq = 'results/trimmed_long_reads/{sample}.fastq.gz',
+    container: quast_container
+    threads: 1 # overidden by profile config, but required...
+    log: 'workflow/logs/quast_{sample}.log'
+    shell: """
+        mkdir $TMPDIR/reads
+        cp {input.short_fq1} $TMPDIR/reads/{wildcards.sample}_1.fastq.gz
+        cp {input.short_fq2} $TMPDIR/reads/{wildcards.sample}_2.fastq.gz
 
+        job_args=""
+        if [ -f {params.long_fq} ]; then
+            cp -v {params.long_fq} $TMPDIR/reads/{wildcards.sample}.fastq.gz
+            job_args="--nanopore $TMPDIR/reads/{wildcards.sample}.fastq.gz"
+        fi
 
-# rule quast:
-# 	input: 
-# 		run1_fq1='data/{sample}/{sample}_run1_1.fastq.gz',
-# 		run1_fq2='data/{sample}/{sample}_run1_2.fastq.gz',
-# 		run2_fq1='data/{sample}/{sample}_1.fastq.gz',
-# 		run2_fq2='data/{sample}/{sample}_2.fastq.gz',
-# 		long_fq='data/{sample}/{sample}.fastq.gz',
-# 		assembly='assemblies/{sample}/assembly.fasta'
-# 	output: "quast/{sample}/latest/report.txt"
-# 	params:
-# 		sample="{sample}"
-# 	shell: """
-# mkdir $TMPDIR/reads
-# cp {input.run2_fq1} $TMPDIR/reads/{params.sample}_1.fastq.gz
-# cp {input.run2_fq2} $TMPDIR/reads/{params.sample}_2.fastq.gz
-# cat {input.run1_fq1} >> $TMPDIR/reads/{params.sample}_1.fastq.gz
-# cat {input.run1_fq2} >> $TMPDIR/reads/{params.sample}_2.fastq.gz
-# cp -v {input.long_fq} $TMPDIR/reads
-
-# quast --pe1 $TMPDIR/reads/{params.sample}_1.fastq.gz --pe2 $TMPDIR/reads/{params.sample}_2.fastq.gz \
-# 	--nanopore $TMPDIR/reads/{params.sample}.fastq.gz --circos -L -r reference_data/NCIB3610.fasta \
-# 	-o quast/{params.sample} {input.assembly}
-# """
+        quast \
+        --pe1 $TMPDIR/reads/{wildcards.sample}_1.fastq.gz \
+        --pe2 $TMPDIR/reads/{wildcards.sample}_2.fastq.gz \
+        $job_args \
+        -l {wildcards.sample} \
+        -o results/quast/{wildcards.sample} \
+        --threads {threads} \
+        --no-html \
+        {input.assembly} > {log} 2>&1
+"""
 
 rule multiqc:
     input:
         files = expand('results/trimmed_short_reads/{sample}_fastp.json', sample=SAMPLES) +
                 expand('results/long_read_stats/{sample}_nanostat.txt', sample=LONG_SAMPLES) +
-                ANNOTS + GTDBTK + BUSCOS,
+                FASTQC_OUTPUTS + ANNOTS + GTDBTK + BUSCOS + QUASTS,
         config = 'etc/multiqc.conf'
     output:
         'workflow/reports/multiqc_report.html'
