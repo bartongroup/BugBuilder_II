@@ -27,6 +27,7 @@ flye_container = "docker://quay.io/biocontainers/flye:2.9.6--py311h2de2dd3_0"
 unicycler_container = "docker://quay.io/biocontainers/unicycler:0.5.1--py39h746d604_5"
 bakta_container = "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
 gtdbtk_container =  "docker://quay.io/biocontainers/gtdbtk:2.6.1--pyh1f0d9b5_2"
+checkm2_container = "docker://quay.io/biocontainers/checkm2:1.1.0--pyh7e72e81_1"
 busco_container = "docker://ezlabgva/busco:v6.0.0_cv1"
 quast_container = "docker://quay.io/biocontainers/quast:5.3.0--py313pl5321h5ca1c30_2"
 multiqc_container = "docker://quay.io/biocontainers/multiqc:1.33--pyhdfd78af_0"
@@ -104,6 +105,7 @@ BAKTA_DB = (
 AMRFINDER_DB=f'{BAKTA_DB_PATH}/amrfinderplus-db/latest/version.txt'
 
 BUSCO_DB = "databases/busco_lineages/download.complete"
+CHECKM2_DB = "databases/checkm2_db/uniref100.KO.1.dmnd"
 
 # Way too many files in GTDB to list them all, so just one as a target
 GTDB = ['databases/gtdbtk/taxonomy/gtdb_taxonomy.tsv']
@@ -130,6 +132,8 @@ FASTQC_OUTPUTS = expand("results/fastqc/{sample}_{read}_fastqc.zip",
     read=[1,2]
 )
 BUSCOS=expand("results/busco/{sample}.short_summary.txt",
+    sample=SAMPLES)
+CHECKMS = expand("results/checkm2/{sample}/quality_report.tsv", 
     sample=SAMPLES)
 
 QUASTS=expand("results/quast/{sample}/report.txt",sample=SAMPLES)
@@ -185,6 +189,17 @@ rule busco_download:
     shell: """
     bin/download_busco_lineages.py > {log} 2>&1
     touch {output}
+"""
+
+rule checkm2_download:
+    output: CHECKM2_DB
+    log: 'workflow/logs/checkm2_download.log'
+    shell: """
+    mkdir -p databases/checkm2_db
+    wget https://zenodo.org/records/14897628/files/checkm2_database.tar.gz?download=1 \
+        -O databases/checkm2_db/checkm2_database.tar.gz
+    tar -xzf databases/checkm2_db/checkm2_database.tar.gz -C databases/checkm2_db/ --strip-components=1
+    rm databases/checkm2_db/checkm2_database.tar.gz
 """
 
 rule fastqc:
@@ -425,6 +440,25 @@ rule busco:
         cp -v $result $current_dir/{output} >> $current_dir/{log} 2>&1
 """
 
+rule checkm2: 
+    input: 
+        assembly = get_assembly_path,
+        database = CHECKM2_DB
+    output: "results/checkm2/{sample}/quality_report.tsv"
+    container: checkm2_container
+    threads: 1 # overidden by profile config, but required...
+    log: 'workflow/logs/checkm2_{sample}.log'
+    shell: """
+    checkm2 predict \
+        --input {input.assembly} \
+        --output_dir results/checkm2/{wildcards.sample} \
+        --database {input.database} \
+        --threads {threads} \
+        --force \
+        --tmpdir $TMPDIR \
+        > {log} 2>&1
+"""
+
 # rule bandage:
 # 	input: GFAS
 # 	output: BANDAGE_IMGS
@@ -449,6 +483,7 @@ rule quast:
     output: "results/quast/{sample}/report.txt"
     params:
         long_fq = 'results/trimmed_long_reads/{sample}.fastq.gz',
+        genome_size = genome_size
     container: quast_container
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/quast_{sample}.log'
@@ -466,7 +501,9 @@ rule quast:
         quast \
         --pe1 $TMPDIR/reads/{wildcards.sample}_1.fastq.gz \
         --pe2 $TMPDIR/reads/{wildcards.sample}_2.fastq.gz \
+        --features results/annotated/{wildcards.sample}/{wildcards.sample}.gff3 \
         $job_args \
+        --est-ref-size {params.genome_size} \
         -l {wildcards.sample} \
         -o results/quast/{wildcards.sample} \
         --threads {threads} \
@@ -478,7 +515,7 @@ rule multiqc:
     input:
         files = expand('results/trimmed_short_reads/{sample}_fastp.json', sample=SAMPLES) +
                 expand('results/long_read_stats/{sample}_nanostat.txt', sample=LONG_SAMPLES) +
-                FASTQC_OUTPUTS + ANNOTS + GTDBTK + BUSCOS + QUASTS,
+                FASTQC_OUTPUTS + ANNOTS + GTDBTK + CHECKMS + BUSCOS + QUASTS,
         config = 'etc/multiqc.conf'
     output:
         'workflow/reports/multiqc_report.html'
