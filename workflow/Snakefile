@@ -18,19 +18,21 @@ gtdb_version = '226'
 #
 ################################################################################
 
-fastp_container = "docker://quay.io/biocontainers/fastp:1.1.0--heae3180_0"
-fastqc_container = "docker://quay.io/biocontainers/fastqc:0.12.1--hdfd78af_0"
-chopper_container = "docker://quay.io/biocontainers/chopper:0.12.0--hcdda2d0_0"
-nanostat_container = "docker://quay.io/biocontainers/nanostat:1.6.0--pyhdfd78af_0"
-spades_container = "docker://simonbrandt/spades:v4.2.0"
-flye_container = "docker://quay.io/biocontainers/flye:2.9.6--py311h2de2dd3_0"
-unicycler_container = "docker://quay.io/biocontainers/unicycler:0.5.1--py39h746d604_5"
-bakta_container = "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
-gtdbtk_container =  "docker://quay.io/biocontainers/gtdbtk:2.6.1--pyh1f0d9b5_2"
-checkm2_container = "docker://quay.io/biocontainers/checkm2:1.1.0--pyh7e72e81_1"
-busco_container = "docker://ezlabgva/busco:v6.0.0_cv1"
-quast_container = "docker://quay.io/biocontainers/quast:5.3.0--py313pl5321h5ca1c30_2"
-multiqc_container = "docker://quay.io/biocontainers/multiqc:1.33--pyhdfd78af_0"
+containers = {
+    "fastp": "docker://quay.io/biocontainers/fastp:1.1.0--heae3180_0",
+    "fastqc": "docker://quay.io/biocontainers/fastqc:0.12.1--hdfd78af_0",
+    "chopper": "docker://quay.io/biocontainers/chopper:0.12.0--hcdda2d0_0",
+    "nanostat": "docker://quay.io/biocontainers/nanostat:1.6.0--pyhdfd78af_0",
+    "spades": "docker://simonbrandt/spades:v4.2.0",
+    "flye": "docker://quay.io/biocontainers/flye:2.9.6--py311h2de2dd3_0",
+    "unicycler": "docker://quay.io/biocontainers/unicycler:0.5.1--py39h746d604_5",
+    "bakta": "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0",
+    "gtdbtk": "docker://quay.io/biocontainers/gtdbtk:2.6.1--pyh1f0d9b5_2",
+    "checkm2": "docker://quay.io/biocontainers/checkm2:1.1.0--pyh7e72e81_1",
+    "busco": "docker://ezlabgva/busco:v6.0.0_cv1",
+    "quast": "docker://quay.io/biocontainers/quast:5.3.0--py313pl5321h5ca1c30_2",
+    "multiqc": "docker://quay.io/biocontainers/multiqc:1.33--pyhdfd78af_0"
+}
 
 ################################################################################
 #
@@ -109,7 +111,6 @@ CHECKM2_DB = "databases/checkm2_db/uniref100.KO.1.dmnd"
 
 # Way too many files in GTDB to list them all, so just one as a target
 GTDB = ['databases/gtdbtk/taxonomy/gtdb_taxonomy.tsv']
-GTDBTK = ['results/gtdbtk/gtdbtk.bac120.summary.tsv']
 
 ################################################################################
 # 
@@ -135,17 +136,11 @@ BUSCOS=expand("results/busco/{sample}.short_summary.txt",
     sample=SAMPLES)
 CHECKMS = expand("results/checkm2/{sample}/quality_report.tsv", 
     sample=SAMPLES)
-
+GTDBTK = ['results/gtdbtk/gtdbtk.bac120.summary.tsv']
 QUASTS=expand("results/quast/{sample}/report.txt",sample=SAMPLES)
-
-#GFAS=expand("assemblies/{sample}/assembly.gfa",sample=SAMPLES)
-
-#BANDAGE_IMGS=expand("assembly_viz/{sample}.png",sample=SAMPLES)
-
 MULTIQC_REPORT = ['workflow/reports/multiqc_report.html']
 
-OUTPUTS = ANNOTS + BUSCOS + MULTIQC_REPORT
-#OUTPUTS=ANNOTS+BANDAGE_IMGS+BUSCOS+QUASTS
+OUTPUTS = ANNOTS + BUSCOS + GTDBTK + QUASTS + CHECKMS + FASTQC_OUTPUTS + MULTIQC_REPORT
 
 ################################################################################
 #
@@ -158,7 +153,7 @@ rule all:
 
 rule bakta_download:
     output: BAKTA_DB
-    container: bakta_container
+    container: containers["bakta"]
     shell:"""
 mkdir -p databases/bakta_db
 bakta_db download --output databases/bakta_db
@@ -167,7 +162,7 @@ bakta_db download --output databases/bakta_db
 rule amrfinder_download:
     input: BAKTA_DB
     output: AMRFINDER_DB	
-    container: bakta_container
+    container: containers["bakta"]
     shell:"""
     amrfinder_update --database databases/bakta_db/db/amrfinderplus-db/
 """
@@ -209,7 +204,7 @@ rule fastqc:
     output:
         fq1 = 'results/fastqc/{sample}_1_fastqc.zip',
         fq2 = 'results/fastqc/{sample}_2_fastqc.zip'
-    container: fastqc_container
+    container: containers["fastqc"]
     log: 'workflow/logs/fastqc_{sample}.log'
     shell: """
         fastqc \
@@ -227,7 +222,7 @@ rule fastp:
         fq1 = 'results/trimmed_short_reads/{sample}_1.fastq.gz',
         fq2 = 'results/trimmed_short_reads/{sample}_2.fastq.gz',
         json = 'results/trimmed_short_reads/{sample}_fastp.json'
-    container: fastp_container
+    container: containers["fastp"]
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/fastp_{sample}.log'
     shell: """
@@ -249,7 +244,7 @@ rule chopper:
         long_reads = 'data/{sample}/long_reads/{sample}.fastq.gz'
     output:
         filtered_reads = 'results/trimmed_long_reads/{sample}.fastq.gz'
-    container: chopper_container
+    container: containers["chopper"]
     threads: 1 # overidden by profile config, but required...
     params:
         min_qual = 10,   # Minimum average Phred score
@@ -265,7 +260,7 @@ rule chopper:
 rule nanostat:
     input: 'data/{sample}/long_reads/{sample}.fastq.gz'
     output: 'results/long_read_stats/{sample}_nanostat.txt'
-    container: nanostat_container
+    container: containers["nanostat"]
     log: 'workflow/logs/nanostat_{sample}.log'
     threads: 1 # overidden by profile config, but required...
     shell: """
@@ -284,7 +279,7 @@ rule spades:
     output: 
         contigs = "results/assembly/short_assembly/{sample}.fasta",
         gfa = "results/assembly/short_assembly/{sample}.gfa"
-    container: spades_container
+    container: containers["spades"]
     log: 'workflow/logs/spades_{sample}.log'
     threads: 1 # overidden by profile config, but required...
     resources:
@@ -312,7 +307,7 @@ rule flye:
         assembly = "results/flye/{sample}.fasta",
         gfa = "results/flye/{sample}.gfa",
         info = "results/flye/{sample}_assembly_info.txt"
-    container: flye_container
+    container: containers["flye"]
     log: 'workflow/logs/flye_{sample}.log'
     threads: 1 # overidden by profile config, but required...
     resources:
@@ -342,7 +337,7 @@ rule unicycler:
     output: 
         contigs = "results/assembly/long_assembly/{sample}.fasta",
             gfa = "results/assembly/long_assembly/{sample}.gfa" 
-    container: unicycler_container
+    container: containers["unicycler"]
     log: 'workflow/logs/unicycler_{sample}.log'
     threads: 1 # overidden by profile config, but required...
     resources:
@@ -373,7 +368,7 @@ rule bakta:
     output:
         multiext("results/annotated/{sample}/{sample}",'.tsv','.gff3',
             '.gbff','.embl','.fna','.ffn','.faa','.hypotheticals.tsv','.txt','.json')
-    container: bakta_container
+    container: containers["bakta"]
     log: 'workflow/logs/bakta_{sample}.log'
     params:
         gram=gram
@@ -398,13 +393,12 @@ rule gtdbtk:
         database = GTDB
     output:
         "results/gtdbtk/gtdbtk.bac120.summary.tsv"
-    container: gtdbtk_container
+    container: containers["gtdbtk"]
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/gtdbtk.log'
     shell: """
 export GTDBTK_DATA_PATH="databases/gtdbtk"
 gtdbtk classify_wf \
-        --skip_ani_screen \
         --genome_dir results/assembly \
         --out_dir results/gtdbtk/ \
         -x fasta \
@@ -420,7 +414,7 @@ rule busco:
         assembly = get_assembly_path,
         database = "databases/busco_lineages/download.complete"
     output: "results/busco/{sample}.short_summary.txt"
-    container: busco_container
+    container: containers["busco"]
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/busco_{sample}.log'
     shell: """
@@ -445,7 +439,7 @@ rule checkm2:
         assembly = get_assembly_path,
         database = CHECKM2_DB
     output: "results/checkm2/{sample}/quality_report.tsv"
-    container: checkm2_container
+    container: containers["checkm2"]
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/checkm2_{sample}.log'
     shell: """
@@ -459,22 +453,6 @@ rule checkm2:
         > {log} 2>&1
 """
 
-# rule bandage:
-# 	input: GFAS
-# 	output: BANDAGE_IMGS
-# 	shell: """
-# mkdir $TMPDIR/XDG
-# chmod -R 0700 $TMPDIR
-# Xvfb :99 &
-# export DISPLAY=:99
-# export XDG_RUNTIME_DIR=$TMPDIR/XDG
-# for GFA in {input}; do
-# 	sample=$(dirname $GFA|sed 's|assemblies/||')
-# 	echo $sample
-# 	Bandage image $GFA assembly_viz/$sample.png --nodewidth 3  --names --fontsize 6
-# done
-# """
-
 rule quast:
     input: 
         short_fq1 = 'results/trimmed_short_reads/{sample}_1.fastq.gz',
@@ -484,7 +462,7 @@ rule quast:
     params:
         long_fq = 'results/trimmed_long_reads/{sample}.fastq.gz',
         genome_size = genome_size
-    container: quast_container
+    container: containers["quast"]
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/quast_{sample}.log'
     shell: """
@@ -510,16 +488,23 @@ rule quast:
         --no-html \
         {input.assembly} > {log} 2>&1
 """
+rule software_versions:
+    output: 'results/software_mqc_versions.yaml'
+    run:
+        with open(output[0], 'w') as f:
+            for name, container in containers.items():
+                version = container.split(':')[-1].split('--')[0]
+                f.write(f"{name}: {version}\n")
 
 rule multiqc:
     input:
         files = expand('results/trimmed_short_reads/{sample}_fastp.json', sample=SAMPLES) +
                 expand('results/long_read_stats/{sample}_nanostat.txt', sample=LONG_SAMPLES) +
-                FASTQC_OUTPUTS + ANNOTS + GTDBTK + CHECKMS + BUSCOS + QUASTS,
+                FASTQC_OUTPUTS + ANNOTS + GTDBTK + CHECKMS + BUSCOS + QUASTS + ['results/software_mqc_versions.yaml'],
         config = 'etc/multiqc.conf'
     output:
         'workflow/reports/multiqc_report.html'
-    container: multiqc_container
+    container: containers["multiqc"]
     log: 'workflow/logs/multiqc.log'
     shell:
         """
