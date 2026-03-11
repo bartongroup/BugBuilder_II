@@ -132,7 +132,7 @@ FASTQC_OUTPUTS = expand("results/fastqc/{sample}_{read}_fastqc.zip",
     sample=SAMPLES,
     read=[1,2]
 )
-BUSCOS=expand("results/busco/{sample}.short_summary.txt",
+BUSCOS=expand("results/busco/short_summary_{sample}.txt",
     sample=SAMPLES)
 CHECKMS = expand("results/checkm2/{sample}/quality_report.tsv", 
     sample=SAMPLES)
@@ -413,7 +413,7 @@ rule busco:
     input: 
         assembly = get_assembly_path,
         database = "databases/busco_lineages/download.complete"
-    output: "results/busco/{sample}.short_summary.txt"
+    output: "results/busco/short_summary_{sample}.txt"
     container: containers["busco"]
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/busco_{sample}.log'
