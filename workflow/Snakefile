@@ -11,6 +11,7 @@ import os
 genome_size = 5_000_000 # 5 Mbp, typical for Bacillus subtilis, and median-ish for Bacillus as a whole
 gram = '+' # default to gram positive, used for bakta annotation
 gtdb_version = '226'
+kraken_db_version = "20260226"
 
 ################################################################################
 #
@@ -23,6 +24,7 @@ containers = {
     "fastqc": "docker://quay.io/biocontainers/fastqc:0.12.1--hdfd78af_0",
     "chopper": "docker://quay.io/biocontainers/chopper:0.12.0--hcdda2d0_0",
     "nanostat": "docker://quay.io/biocontainers/nanostat:1.6.0--pyhdfd78af_0",
+    "kraken2": "docker://quay.io/biocontainers/kraken2:2.17.1--pl5321h077b44d_0",
     "spades": "docker://simonbrandt/spades:v4.2.0",
     "flye": "docker://quay.io/biocontainers/flye:2.9.6--py311h2de2dd3_0",
     "unicycler": "docker://quay.io/biocontainers/unicycler:0.5.1--py39h746d604_5",
@@ -90,7 +92,7 @@ for sample in SAMPLES:
 BAKTA_DB_PATH = "databases/bakta_db/db"
 
 # Bakta database consists of multiple files with different extensions depending on the type of data
-DB_MAP = {
+BAKTA_DB_MAP = {
     "hmmer": (["antifam", "pfam"], [".h3f", ".h3i", ".h3m", ".h3p"]),
     "infernal": (["ncRNA-genes", "ncRNA-regions", "rRNA"], [".i1i", ".i1f", ".i1m", ".i1p"]),
     "singletons": [
@@ -100,9 +102,24 @@ DB_MAP = {
 }
 
 BAKTA_DB = (
-    [f"{BAKTA_DB_PATH}/{p}{ext}" for p, exts in [DB_MAP["hmmer"], DB_MAP["infernal"]] for p in p for ext in exts] +
-    [f"{BAKTA_DB_PATH}/{f}" for f in DB_MAP["singletons"]]
+    [f"{BAKTA_DB_PATH}/{p}{ext}" for p, exts in [BAKTA_DB_MAP["hmmer"], BAKTA_DB_MAP["infernal"]] for p in p for ext in exts] +
+    [f"{BAKTA_DB_PATH}/{f}" for f in BAKTA_DB_MAP["singletons"]]
 )
+
+# Kraken2 database files...
+KRAKEN_DB_MAP=  { "kmers": [50,75,100,150,200,250,300],
+                  "k2d": ["hash", "opts", "taxo" ],
+                  "dmp": ["names", "nodes"],
+                  "txt": ["inspect", "unmapped_accessions"],
+                  "tsv": ["ktaxonomy", "library_report"] } 
+
+KRAKEN_DB_PATH = "databases/kraken2"
+KRAKEN_DB = ( [f"{KRAKEN_DB_PATH}/database{kmers}mers.kmer_distrib" for kmers in KRAKEN_DB_MAP["kmers"]] +
+              [f"{KRAKEN_DB_PATH}/{k2d}.k2d" for k2d in ["hash", "opts", "taxo"]] +
+              [f"{KRAKEN_DB_PATH}/{dmp}.dmp" for dmp in KRAKEN_DB_MAP["dmp"]] +
+              [f"{KRAKEN_DB_PATH}/{txt}.txt" for txt in KRAKEN_DB_MAP["txt"]] +
+              [f"{KRAKEN_DB_PATH}/{tsv}.tsv" for tsv in KRAKEN_DB_MAP["tsv"]] +
+              [f"{KRAKEN_DB_PATH}/seqid2taxid.map"] )
 
 AMRFINDER_DB=f'{BAKTA_DB_PATH}/amrfinderplus-db/latest/version.txt'
 
@@ -120,6 +137,8 @@ GTDB = ['databases/gtdbtk/taxonomy/gtdb_taxonomy.tsv']
 
 SHORT_ASSEMBLIES = expand("results/assembly/short_assembly/{sample}.fasta",sample=SHORT_SAMPLES)
 LONG_ASSEMBLIES = expand("results/assembly/long_assembly/{sample}.fasta",sample=LONG_SAMPLES)
+
+KRAKEN_REPORTS = expand("results/kraken2/{sample}_kraken_report.txt", sample=SAMPLES)
 
 ANNOT_EXTS = ['.tsv', '.gff3', '.gbff', '.embl', '.fna', 
               '.ffn', '.faa', '.hypotheticals.tsv', '.txt', '.json']
@@ -150,6 +169,15 @@ OUTPUTS = ANNOTS + BUSCOS + GTDBTK + QUASTS + CHECKMS + FASTQC_OUTPUTS + MULTIQC
 
 rule all:
     input: OUTPUTS
+
+rule kraken_db_download:
+    output: KRAKEN_DB
+    log: 'workflow/logs/kraken_db_download.log'
+    shell:"""
+mkdir -p databases/kraken2
+bin/download_krakendb.py --version {kraken_db_version} > {log} 2>&1
+ls -l databases/kraken2/ >> {log} 2>&1
+"""
 
 rule bakta_download:
     output: BAKTA_DB
@@ -270,6 +298,29 @@ rule nanostat:
             --threads {threads} \
             --tsv \
         > {log} 2>&1
+    """
+
+rule kraken:
+    input: 
+        r1 = 'results/trimmed_short_reads/{sample}_1.fastq.gz', 
+        r2 = 'results/trimmed_short_reads/{sample}_2.fastq.gz',
+        db = KRAKEN_DB
+    output: 
+        output = 'results/kraken2/{sample}_kraken_output.txt',
+        report = 'results/kraken2/{sample}_kraken_report.txt'
+    container: containers["kraken2"]
+    log: 'workflow/logs/kraken2_{sample}.log'
+    threads: 1 # overidden by profile config, but required...
+    shell: """
+    k2 classify \
+        --db databases/kraken2/ \
+        --threads {threads} \
+        --memory-mapping \
+        --use-names \
+        --output {output.output} \
+        --report {output.report} \
+        --paired \
+        {input.r1} {input.r2} > {log} 2>&1
     """
 
 rule spades:
@@ -500,7 +551,8 @@ rule multiqc:
     input:
         files = expand('results/trimmed_short_reads/{sample}_fastp.json', sample=SAMPLES) +
                 expand('results/long_read_stats/{sample}_nanostat.txt', sample=LONG_SAMPLES) +
-                FASTQC_OUTPUTS + ANNOTS + GTDBTK + CHECKMS + BUSCOS + QUASTS + ['results/software_mqc_versions.yaml'],
+                FASTQC_OUTPUTS + KRAKEN_REPORTS + ANNOTS + GTDBTK + CHECKMS + BUSCOS + QUASTS + 
+                ['results/software_mqc_versions.yaml'],
         config = 'etc/multiqc.conf'
     output:
         'workflow/reports/multiqc_report.html'

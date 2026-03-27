@@ -18,6 +18,7 @@ set-threads:
   fastp: 4
   chopper: 4
   nanostat: 4
+  kraken: 48
   spades: 16
   flye: 16
   unicycler: 32
@@ -26,6 +27,8 @@ set-threads:
   gtdbtk: 24
   quast: 16
 set-resources:
+  kraken:
+    mem_mb: 256000
   spades:
     mem_mb: 64000
   flye:
