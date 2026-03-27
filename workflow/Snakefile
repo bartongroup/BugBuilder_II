@@ -29,6 +29,7 @@ containers = {
     "flye": "docker://quay.io/biocontainers/flye:2.9.6--py311h2de2dd3_0",
     "unicycler": "docker://quay.io/biocontainers/unicycler:0.5.1--py39h746d604_5",
     "bakta": "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0",
+    "blast": "docker://quay.io/biocontainers/blast:2.17.0--h66d330f_0",
     "gtdbtk": "docker://quay.io/biocontainers/gtdbtk:2.6.1--pyh1f0d9b5_2",
     "checkm2": "docker://quay.io/biocontainers/checkm2:1.1.0--pyh7e72e81_1",
     "busco": "docker://ezlabgva/busco:v6.0.0_cv1",
@@ -147,6 +148,20 @@ ANNOTS = expand(
     sample=SAMPLES, 
     ext=ANNOT_EXTS
 )
+
+BLAST_GENOMIC_SUFFIXES = ['','.ndb', '.nhr', '.nin', '.njs', '.not', '.nsq', '.ntf', '.nto']
+BLAST_PROTEIN_SUFFIXES = ['','.pdb', '.phr', '.pin', '.pjs', '.pot', '.psq', '.ptf', '.pto']
+
+BLAST_GENOMIC = expand("results/blast_db/genome/{sample}{suffix}", 
+    sample=SAMPLES, suffix=BLAST_GENOMIC_SUFFIXES)
+BLAST_PROTEIN = expand("results/blast_db/protein/{sample}{suffix}", 
+    sample=SAMPLES, suffix=BLAST_PROTEIN_SUFFIXES)
+
+BLAST_ALIAS_DBS = [
+    "results/blast_db/assemblies.nal",
+    "results/blast_db/assemblies.pal"
+]
+
 FASTQC_OUTPUTS = expand("results/fastqc/{sample}_{read}_fastqc.zip",
     sample=SAMPLES,
     read=[1,2]
@@ -159,7 +174,8 @@ GTDBTK = ['results/gtdbtk/gtdbtk.bac120.summary.tsv']
 QUASTS=expand("results/quast/{sample}/report.txt",sample=SAMPLES)
 MULTIQC_REPORT = ['workflow/reports/multiqc_report.html']
 
-OUTPUTS = ANNOTS + BUSCOS + GTDBTK + QUASTS + CHECKMS + FASTQC_OUTPUTS + MULTIQC_REPORT
+OUTPUTS = ANNOTS + BLAST_ALIAS_DBS + BUSCOS + GTDBTK + QUASTS + \
+    CHECKMS + FASTQC_OUTPUTS + MULTIQC_REPORT
 
 ################################################################################
 #
@@ -437,6 +453,61 @@ rule bakta:
         --force \
         {input.contigs} > {log} 2>&1
 """
+
+rule blast_format:
+    input: 
+        genome="results/annotated/{sample}/{sample}.fna",
+        protein="results/annotated/{sample}/{sample}.faa"
+    output: 
+        genome=multiext("results/blast_db/genome/{sample}",'','.ndb', '.nhr', '.nin', '.njs', '.not', '.nsq', '.ntf', '.nto'),
+        protein=multiext("results/blast_db/protein/{sample}",'','.pdb', '.phr', '.pin', '.pjs', '.pot', '.psq', '.ptf', '.pto')
+    container: containers["blast"]
+    log: 'workflow/logs/blast_format_{sample}.log'
+    shell: """
+        cat {input.genome} |  sed -E 's/(contig_[0-9]*).*/{wildcards.sample}|\\1/' > \
+            results/blast_db/genome/{wildcards.sample}
+        cp {input.protein} results/blast_db/protein/{wildcards.sample}
+
+        makeblastdb \
+            -in results/blast_db/genome/{wildcards.sample} \
+            -dbtype nucl \
+            -out results/blast_db/genome/{wildcards.sample} \
+            > {log} 2>&1
+
+        makeblastdb \
+            -in results/blast_db/protein/{wildcards.sample} \
+            -dbtype prot \
+            -out results/blast_db/protein/{wildcards.sample} \
+            > {log} 2>&1
+    """
+
+rule combined_blast_db:
+    input: BLAST_GENOMIC + BLAST_PROTEIN
+    output:
+        genome = "results/blast_db/assemblies.nal",
+        protein = "results/blast_db/assemblies.pal"
+    container: containers["blast"]
+    log: 'workflow/logs/combined_blast_db.log'
+    shell: """
+    ls results/blast_db/genome|grep -v \\\\. | \
+        sed 's|^|results/blast_db/genome/|' > $TMPDIR/genome_samples.txt
+
+    ls  results/blast_db/protein|grep -v \\\\. | \
+        sed 's|^|results/blast_db/protein/|' > $TMPDIR/protein_samples.txt
+
+    blastdb_aliastool -dblist_file $TMPDIR/genome_samples.txt \
+        -dbtype nucl \
+        -title "Combined Genomic Assemblies" \
+        -out results/blast_db/assemblies
+        >> {log} 2>&1
+
+    blastdb_aliastool -dblist_file $TMPDIR/protein_samples.txt \
+        -dbtype prot \
+        -title "Combined Protein Predictions" \
+        -out results/blast_db/assemblies
+        >> {log} 2>&1
+    """
+
 
 rule gtdbtk:
     input:
