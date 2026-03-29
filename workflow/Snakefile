@@ -135,6 +135,7 @@ GTDB = ['databases/gtdbtk/taxonomy/gtdb_taxonomy.tsv']
 # Define outputs...
 #
 ################################################################################
+NANO_TRIMMED = expand("results/long_read_stats/{sample}_trimmed_nanostat.txt", sample=LONG_SAMPLES)
 
 SHORT_ASSEMBLIES = expand("results/assembly/short_assembly/{sample}.fasta",sample=SHORT_SAMPLES)
 LONG_ASSEMBLIES = expand("results/assembly/long_assembly/{sample}.fasta",sample=LONG_SAMPLES)
@@ -316,6 +317,21 @@ rule nanostat:
         > {log} 2>&1
     """
 
+rule nanostat_trimmed:
+    input: 'results/trimmed_long_reads/{sample}.fastq.gz'
+    output: 'results/long_read_stats/{sample}_trimmed_nanostat.txt'
+    container: containers["nanostat"]
+    log: 'workflow/logs/nanostat_{sample}.log'
+    threads: 1 # overidden by profile config, but required...
+    shell: """
+        NanoStat \
+            --fastq {input} \
+            --name {output} \
+            --threads {threads} \
+            --tsv \
+        > {log} 2>&1
+    """
+
 rule kraken:
     input: 
         r1 = 'results/trimmed_short_reads/{sample}_1.fastq.gz', 
@@ -369,7 +385,9 @@ rule spades:
     """
 
 rule flye:
-    input: "results/trimmed_long_reads/{sample}.fastq.gz"
+    input: 
+        fastq="results/trimmed_long_reads/{sample}.fastq.gz",
+        stats="results/long_read_stats/{sample}_trimmed_nanostat.txt" 
     output: 
         assembly = "results/flye/{sample}.fasta",
         gfa = "results/flye/{sample}.gfa",
@@ -382,7 +400,7 @@ rule flye:
     params:
         genome_size = genome_size
     shell: """
-        (cp -v {input} $TMPDIR &&
+        (cp -v {input.fastq} $TMPDIR &&
         flye \
             --nano-hq $TMPDIR/{wildcards.sample}.fastq.gz \
             --out-dir $TMPDIR/flye \
