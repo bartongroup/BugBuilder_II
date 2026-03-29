@@ -1,5 +1,8 @@
 from glob import glob
-import os
+import pandas as pd
+import json
+
+configfile: "workflow/config/config.yaml"
 
 ################################################################################
 #
@@ -65,6 +68,111 @@ def get_assembly_path(wildcards):
         return f"results/assembly/short_assembly/{wildcards.sample}.fasta"
     else:
         return f"results/assembly/long_assembly/{wildcards.sample}.fasta"
+
+def get_assembly_type(wildcards):
+    """
+    Return the assembly type (short or long) based on the sample.
+    """
+    if wildcards.sample in LONG_SAMPLES:
+        return "long"
+    else:
+        return "short"
+
+def get_quast_stats(quast_report,log):
+    """
+    Extracts key statistics from QUAST report. 
+
+    Required parameters:
+        quast_report: Path to the QUAST report.tsv file
+        log: Path to log file
+
+    Returns:
+        A dictionary with keys: 'assembly_size', 'num_contigs', 'gc_content', 'n50'
+    """
+    with open(log[0], 'a') as log_file:
+        log_file.write(f"Extracting QUAST stats from {quast_report}\n")
+
+        quast_df = pd.read_csv(quast_report, sep='\t', header=None)
+        log_file.write("QUAST report loaded successfully.\n")
+
+        quast_df.set_index(0,inplace=True)
+        quast_df = quast_df.transpose()
+
+        stats = {
+            "assembly_size": int(quast_df['Total length'].values[0]),
+            "num_contigs": int(quast_df['# contigs'].values[0]),
+            "gc_content": float(quast_df['GC (%)'].values[0]),
+            "n50": int(quast_df['N50'].values[0])
+        }
+
+        log_file.write("QUAST stats extracted:\n")
+        for key, value in stats.items():
+            log_file.write(f"{key}: {value}\n")
+
+    return stats
+
+def get_fastp_stats(fastp_json, log):
+    """
+    Extracts key statistics from fastp JSON report.
+
+    Required parameters:
+        fastp_json: Path to the fastp JSON report file
+        log: Path to log file
+
+    Returns:
+        A dictionary with keys: 'total_bases', 'total_reads', 'q20_bases', 'q30_bases'
+    """
+    with open(log[0], 'a') as log_file:
+        log_file.write(f"Extracting fastp stats from {fastp_json}\n")
+
+        with open(fastp_json) as f:
+            data = json.load(f)
+
+        stats = {
+            "total_bases": int(data['summary']['after_filtering']['total_bases']),
+            "total_reads": int(data['summary']['after_filtering']['total_reads']),
+        }
+
+        log_file.write("fastp stats extracted:\n")
+        for key, value in stats.items():
+            log_file.write(f"{key}: {value}\n")
+
+    return stats
+
+def get_nanostat_stats(nanostat_report, log):
+    """
+    Extracts key statistics from NanoStat report.
+
+    Required parameters:
+        nanostat_report: Path to the NanoStat report file
+        log: Path to log file
+
+    Returns:
+        A dictionary with keys: 'total_bases', 'total_reads', 'mean_length', 'n50'
+    """
+    with open(log[0], 'a') as log_file:
+        log_file.write(f"Extracting NanoStat stats from {nanostat_report}\n")
+
+
+        nanostat_df = pd.read_csv(nanostat_report, sep='\t')
+        log_file.write("NanoStat report loaded successfully.\n")
+
+        nanostat_df.set_index('Metrics',inplace=True)
+        nanostat_df = nanostat_df.transpose()
+        int(float(nanostat_df['number_of_bases'].values[0]))
+
+        stats = {
+            "total_bases": int(float(nanostat_df['number_of_bases'].values[0])),
+            "total_reads": int(float(nanostat_df['number_of_bases'].values[0])),
+            "mean_length": int(float(nanostat_df['mean_read_length'].values[0])),
+            "n50": int(float(nanostat_df['n50'].values[0])),
+        }
+
+        log_file.write("NanoStat stats extracted:\n")
+        for key, value in stats.items():
+            log_file.write(f"{key}: {value}\n")
+
+    return stats
 
 ################################################################################
 #
@@ -172,11 +280,13 @@ BUSCOS=expand("results/busco/short_summary_{sample}.txt",
 CHECKMS = expand("results/checkm2/{sample}/quality_report.tsv", 
     sample=SAMPLES)
 GTDBTK = ['results/gtdbtk/gtdbtk.bac120.summary.tsv']
-QUASTS=expand("results/quast/{sample}/report.txt",sample=SAMPLES)
+QUASTS=expand("results/quast/{sample}/report.tsv",sample=SAMPLES)
 MULTIQC_REPORT = ['workflow/reports/multiqc_report.html']
 
+MANIFESTS = expand("results/manifests/{sample}_manifest.tsv", sample=SAMPLES)
+
 OUTPUTS = ANNOTS + BLAST_ALIAS_DBS + BUSCOS + GTDBTK + QUASTS + \
-    CHECKMS + FASTQC_OUTPUTS + MULTIQC_REPORT
+    CHECKMS + FASTQC_OUTPUTS + MULTIQC_REPORT + MANIFESTS
 
 ################################################################################
 #
@@ -598,7 +708,7 @@ rule quast:
         short_fq1 = 'results/trimmed_short_reads/{sample}_1.fastq.gz',
         short_fq2 = 'results/trimmed_short_reads/{sample}_2.fastq.gz',
         assembly=get_assembly_path
-    output: "results/quast/{sample}/report.txt"
+    output: "results/quast/{sample}/report.tsv"
     params:
         long_fq = 'results/trimmed_long_reads/{sample}.fastq.gz',
         genome_size = genome_size
@@ -655,3 +765,46 @@ rule multiqc:
                 --filename multiqc_report.html \
                 --force > {log} 2>&1
         """
+
+rule manifest:
+    input: 
+        fastp = 'results/trimmed_short_reads/{sample}_fastp.json',
+        quast = "results/quast/{sample}/report.tsv"
+    output: "results/manifests/{sample}_manifest.tsv"
+    params: 
+        nanostat = "results/long_read_stats/{sample}_trimmed_nanostat.txt",
+    log: 'workflow/logs/manifest_{sample}.log'
+    run:
+        short_bases = 0
+        long_bases = 0
+        program = 'SPAdes' 
+
+        # Load quast report
+        assembly_stats = get_quast_stats(input.quast, log)
+        assembly_size = assembly_stats['assembly_size']
+        
+        fastp_stats = get_fastp_stats(input.fastp, log)
+        short_bases = fastp_stats['total_bases']
+
+        if get_assembly_type(wildcards) == "long":
+            nanostat_stats = get_nanostat_stats(params.nanostat, log)
+            long_bases = nanostat_stats['total_bases']
+            program = 'flye, unicycler'
+
+        coverage = int((short_bases + long_bases) / assembly_size) if assembly_size > 0 else 0
+
+        # Combine into manifest
+        manifest_df = pd.DataFrame({
+        'STUDY': [config['project_id']],
+        'SAMPLE': [wildcards.sample],
+        'ASSEMBLY_NAME': [wildcards.sample],
+        'ASSEMBLY_TYPE': 'isolate',
+        'COVERAGE': coverage,
+        'PROGRAM': program,
+        'PLATFORM': config['short_read_instrument'] + (f", {config['long_read_instrument']}" \
+            if long_bases > 0 else ""),
+        'MOLECULE_TYPE': 'genomic DNA',
+        })
+
+        manifest_df = manifest_df.transpose()
+        manifest_df.to_csv(output[0], sep='\t', index=True, header=False)
