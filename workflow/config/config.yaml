@@ -1,3 +1,7 @@
 project_id: PRJEB110789
 short_read_instrument: Illumina MiniSeq
 long_read_instrument: Oxford Nanopore GridION
+genome_size: 5_000_000 
+gram: '+' 
+gtdb_version: '226'
+kraken_db_version: "20260226"

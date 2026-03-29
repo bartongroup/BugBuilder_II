@@ -6,18 +6,6 @@ configfile: "workflow/config/config.yaml"
 
 ################################################################################
 #
-# The following parameters may need updating depending on the expected
-# organisms in the samples.
-#
-################################################################################
-
-genome_size = 5_000_000 # 5 Mbp, typical for Bacillus subtilis, and median-ish for Bacillus as a whole
-gram = '+' # default to gram positive, used for bakta annotation
-gtdb_version = '226'
-kraken_db_version = "20260226"
-
-################################################################################
-#
 # Containers...
 #
 ################################################################################
@@ -53,7 +41,7 @@ def get_spades_mode(wildcards, input):
     # Estimate total bases: Gzipped FASTQ is roughly 1 byte per base 
     # (conservative estimate including quality scores and headers)
     file_size_bytes = os.path.getsize(input.fq1) + os.path.getsize(input.fq2)
-    estimated_coverage = file_size_bytes / genome_size
+    estimated_coverage = file_size_bytes / config['genome_size']
     
     if estimated_coverage > 100:
         return "--isolate"
@@ -300,9 +288,11 @@ rule all:
 rule kraken_db_download:
     output: KRAKEN_DB
     log: 'workflow/logs/kraken_db_download.log'
+    params:
+        kraken_db_version = config['kraken_db_version']
     shell:"""
 mkdir -p databases/kraken2
-bin/download_krakendb.py --version {kraken_db_version} > {log} 2>&1
+bin/download_krakendb.py --version {params.kraken_db_version} > {log} 2>&1
 ls -l databases/kraken2/ >> {log} 2>&1
 """
 
@@ -325,7 +315,7 @@ rule amrfinder_download:
 rule gtdb_download:
     output: GTDB
     params:
-        gtdb_version = gtdb_version
+        gtdb_version = config['gtdb_version']
     log: 'workflow/logs/gtdb_download.log'
     shell: """
 bin/download_gtdbtk_db.py \
@@ -508,7 +498,7 @@ rule flye:
     resources:
         mem_mb = 1 # overidden by profile config, but required...
     params:
-        genome_size = genome_size
+        genome_size = config['genome_size']
     shell: """
         (cp -v {input.fastq} $TMPDIR &&
         flye \
@@ -566,7 +556,7 @@ rule bakta:
     container: containers["bakta"]
     log: 'workflow/logs/bakta_{sample}.log'
     params:
-        gram=gram
+        gram=config['gram']
     threads: 1 # overidden by profile config, but required...
     shell:"""
         bakta \
@@ -711,7 +701,7 @@ rule quast:
     output: "results/quast/{sample}/report.tsv"
     params:
         long_fq = 'results/trimmed_long_reads/{sample}.fastq.gz',
-        genome_size = genome_size
+        genome_size = config['genome_size'] 
     container: containers["quast"]
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/quast_{sample}.log'
