@@ -799,7 +799,7 @@ rule manifest:
         manifest_df = pd.DataFrame({
             'STUDY': [config['project_id']],
             'SAMPLE': sample_id,
-            'ASSEMBLY_NAME': [wildcards.sample],
+            'ASSEMBLYNAME': [wildcards.sample],
             'ASSEMBLY_TYPE': 'isolate',
             'COVERAGE': coverage,
             'PROGRAM': program,
@@ -807,7 +807,7 @@ rule manifest:
                 if long_bases > 0 else ""),
             'MOLECULE_TYPE': 'genomic DNA',
             'RUN_REF': run_id,
-            'FLATFILE': f"{wildcards.sample}.embl"
+            'FLATFILE': f"{wildcards.sample}.embl.gz"
         })
 
         manifest_df = manifest_df.transpose()
