@@ -1,0 +1,7 @@
+project_id: ## ENA/GenBank ID, e.g. "PRJNA...."
+short_read_instrument: # Sequencing platform used for short reads, e.g. "Illumina MiSeq"
+long_read_instrument: # Sequencing platform used for long reads, e.g. "Oxford Nanopore MinION"
+genome_size: # estimated size of genome in base pairs
+gram: '+' 
+gtdb_version: '226'
+kraken_db_version: "20260226"
