@@ -1,5 +1,7 @@
 # BugBuilder II
 
+[![DOI](https://zenodo.org/badge/1165561609.svg)](https://doi.org/10.5281/zenodo.19420867)
+
 This workflow is intended to carry out either a short read, or hybrid assembly
 (combining long and short reads) of a number of microbial genomes, using a range
 of well known software tools. Appropriate assembly tools will be selected
