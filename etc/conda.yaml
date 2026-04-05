@@ -1,4 +1,4 @@
-name: microbial_assembly
+name: BugBuilder_II
 channels:
   - bioconda
   - conda-forge
