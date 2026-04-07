@@ -244,6 +244,7 @@ GTDB = [f"{config['database_path']}/gtdbtk/taxonomy/gtdb_taxonomy.tsv"]
 # Define outputs...
 #
 ################################################################################
+
 NANO_TRIMMED = expand("results/long_read_stats/{sample}_trimmed_nanostat.txt", sample=LONG_SAMPLES)
 
 SHORT_ASSEMBLIES = expand("results/assembly/short_assembly/{sample}.fasta",sample=SHORT_SAMPLES)
@@ -312,13 +313,14 @@ bin/download_krakendb.py \
 """
 
 rule bakta_download:
+    input: 'workflow/scripts/download_bakta_db.py'
     output: BAKTA_DB
-#    container: containers["bakta"]
     params:
         database_path = config['database_path']
     log: 'workflow/logs/bakta_db_download.log'
     shell:"""
-bin/download_bakta_db.py \
+export PYTHONPATH=$PYTHONPATH:workflow/scripts
+workflow/scripts/download_bakta_db.py \
     --database_dir {params.database_path} > {log} 2>&1
 """
 
