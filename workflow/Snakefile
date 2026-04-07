@@ -186,7 +186,7 @@ for sample in SAMPLES:
     else:
         SHORT_SAMPLES.append(sample)
 
-BAKTA_DB_PATH = "databases/bakta_db/db"
+BAKTA_DB_PATH = f"{config['database_path']}/bakta_db/db"
 
 # Bakta database consists of multiple files with different extensions depending on the type of data
 BAKTA_DB_MAP = {
@@ -203,6 +203,21 @@ BAKTA_DB = (
     [f"{BAKTA_DB_PATH}/{f}" for f in BAKTA_DB_MAP["singletons"]]
 )
 
+AMRFINDER_DB_MAP = {
+    "hmmer": (["AMR.LIB"], [".h3f", ".h3i", ".h3m", ".h3p"]),
+    "blast": (["AMRProt.fa"], [".pdb", ".phr", ".pin", ".pjs", ".pot", ".psq", ".ptf", ".pto"]),
+    "singletons": [
+        "AMRProt-mutation.tsv","AMRProt-suppress.tsv","AMRProt-susceptible.tsv",
+        "database_format_version.txt", "fam.tsv", "taxgroup.tsv"
+    ]
+}
+
+AMRFINDER_DB = (
+    [f"{BAKTA_DB_PATH}/amrfinderplus-db/latest/{p}{ext}" 
+        for p, exts in [AMRFINDER_DB_MAP["hmmer"], AMRFINDER_DB_MAP["blast"]] for p in p for ext in exts] +
+    [f"{BAKTA_DB_PATH}/amrfinderplus-db/latest/{f}" for f in AMRFINDER_DB_MAP["singletons"]]
+)
+
 # Kraken2 database files...
 KRAKEN_DB_MAP=  { "kmers": [50,75,100,150,200,250,300],
                   "k2d": ["hash", "opts", "taxo" ],
@@ -210,7 +225,7 @@ KRAKEN_DB_MAP=  { "kmers": [50,75,100,150,200,250,300],
                   "txt": ["inspect", "unmapped_accessions"],
                   "tsv": ["ktaxonomy", "library_report"] } 
 
-KRAKEN_DB_PATH = "databases/kraken2"
+KRAKEN_DB_PATH = f"{config['database_path']}/kraken2"
 KRAKEN_DB = ( [f"{KRAKEN_DB_PATH}/database{kmers}mers.kmer_distrib" for kmers in KRAKEN_DB_MAP["kmers"]] +
               [f"{KRAKEN_DB_PATH}/{k2d}.k2d" for k2d in ["hash", "opts", "taxo"]] +
               [f"{KRAKEN_DB_PATH}/{dmp}.dmp" for dmp in KRAKEN_DB_MAP["dmp"]] +
@@ -218,13 +233,11 @@ KRAKEN_DB = ( [f"{KRAKEN_DB_PATH}/database{kmers}mers.kmer_distrib" for kmers in
               [f"{KRAKEN_DB_PATH}/{tsv}.tsv" for tsv in KRAKEN_DB_MAP["tsv"]] +
               [f"{KRAKEN_DB_PATH}/seqid2taxid.map"] )
 
-AMRFINDER_DB=f'{BAKTA_DB_PATH}/amrfinderplus-db/latest/version.txt'
-
-BUSCO_DB = "databases/busco_lineages/download.complete"
-CHECKM2_DB = "databases/checkm2_db/uniref100.KO.1.dmnd"
+BUSCO_DB = f"{config['database_path']}/busco_lineages/download.complete"
+CHECKM2_DB = f"{config['database_path']}/checkm2_db/uniref100.KO.1.dmnd"
 
 # Way too many files in GTDB to list them all, so just one as a target
-GTDB = ['databases/gtdbtk/taxonomy/gtdb_taxonomy.tsv']
+GTDB = [f"{config['database_path']}/gtdbtk/taxonomy/gtdb_taxonomy.tsv"]
 
 ################################################################################
 # 
@@ -287,59 +300,77 @@ rule all:
 
 rule kraken_db_download:
     output: KRAKEN_DB
-    log: 'workflow/logs/kraken_db_download.log'
     params:
+        database_path = config['database_path'],
         kraken_db_version = config['kraken_db_version']
+    log: 'workflow/logs/kraken_db_download.log'
     shell:"""
-mkdir -p databases/kraken2
-bin/download_krakendb.py --version {params.kraken_db_version} > {log} 2>&1
-ls -l databases/kraken2/ >> {log} 2>&1
+mkdir -p {params.database_path}/kraken2
+bin/download_krakendb.py \
+    --database_dir {params.database_path} \
+    --version {params.kraken_db_version} > {log} 2>&1
 """
 
 rule bakta_download:
     output: BAKTA_DB
-    container: containers["bakta"]
+#    container: containers["bakta"]
+    params:
+        database_path = config['database_path']
+    log: 'workflow/logs/bakta_db_download.log'
     shell:"""
-mkdir -p databases/bakta_db
-bakta_db download --output databases/bakta_db
+bin/download_bakta_db.py \
+    --database_dir {params.database_path} > {log} 2>&1
 """
 
 rule amrfinder_download:
     input: BAKTA_DB
-    output: AMRFINDER_DB	
+    output: AMRFINDER_DB
+    params:
+        database_path = config['database_path']
+    log: 'workflow/logs/amrfinder_db_download.log'
     container: containers["bakta"]
     shell:"""
-    amrfinder_update --database databases/bakta_db/db/amrfinderplus-db/
+    amrfinder_update --database {params.database_path}/bakta_db/db/amrfinderplus-db/ \
+        > {log} 2>&1
 """
 
 rule gtdb_download:
     output: GTDB
     params:
+        database_path = config['database_path'],
         gtdb_version = config['gtdb_version']
     log: 'workflow/logs/gtdb_download.log'
     shell: """
 bin/download_gtdbtk_db.py \
-  --release {params.gtdb_version} \
+    --database_dir {params.database_path} \
+    --release {params.gtdb_version} \
   > {log} 2>&1
 """
 
 rule busco_download:
     output: BUSCO_DB
+    params:
+        database_path = config['database_path']
     log: 'workflow/logs/busco_download.log'
     shell: """
-    bin/download_busco_lineages.py > {log} 2>&1
+    bin/download_busco_lineages.py --database_dir {params.database_path} > {log} 2>&1
     touch {output}
 """
 
 rule checkm2_download:
     output: CHECKM2_DB
+    params:
+        database_path = config['database_path']
     log: 'workflow/logs/checkm2_download.log'
     shell: """
-    mkdir -p databases/checkm2_db
-    wget https://zenodo.org/records/14897628/files/checkm2_database.tar.gz?download=1 \
-        -O databases/checkm2_db/checkm2_database.tar.gz
-    tar -xzf databases/checkm2_db/checkm2_database.tar.gz -C databases/checkm2_db/ --strip-components=1
-    rm databases/checkm2_db/checkm2_database.tar.gz
+    ( mkdir -pv {params.database_path}/checkm2_db
+      wget https://zenodo.org/records/14897628/files/checkm2_database.tar.gz?download=1 \
+        -O {params.database_path}/checkm2_db/checkm2_database.tar.gz
+      tar -xzvf {params.database_path}/checkm2_db/checkm2_database.tar.gz \
+        -C {params.database_path}/checkm2_db/ \
+        --strip-components=1
+      rm -fv {params.database_path}/checkm2_db/checkm2_database.tar.gz ) \
+    > {log} 2>&1
 """
 
 rule fastqc:
@@ -556,11 +587,12 @@ rule bakta:
     container: containers["bakta"]
     log: 'workflow/logs/bakta_{sample}.log'
     params:
+        database_path = config['database_path'],
         gram=config['gram']
     threads: 1 # overidden by profile config, but required...
     shell:"""
         bakta \
-        --db databases/bakta_db/db \
+        --db {params.database_path}/bakta_db/db \
         --prefix {wildcards.sample} \
         --output results/annotated/{wildcards.sample} \
         --threads {threads} \
@@ -633,11 +665,14 @@ rule gtdbtk:
         database = GTDB
     output:
         "results/gtdbtk/gtdbtk.bac120.summary.tsv"
+    params:
+        database_path = config['database_path']
     container: containers["gtdbtk"]
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/gtdbtk.log'
     shell: """
-export GTDBTK_DATA_PATH="databases/gtdbtk"
+export GTDBTK_DATA_PATH="{params.database_path}/gtdbtk"
+echo "Running GTDB-Tk classification workflow with GTDBTK_DATA_PATH=$GTDBTK_DATA_PATH"
 gtdbtk classify_wf \
         --genome_dir results/assembly \
         --out_dir results/gtdbtk/ \
@@ -652,7 +687,7 @@ gtdbtk classify_wf \
 rule busco:
     input: 
         assembly = get_assembly_path,
-        database = "databases/busco_lineages/download.complete"
+        database = "{config['database_path']}/busco_lineages/download.complete"
     output: "results/busco/short_summary_{sample}.txt"
     container: containers["busco"]
     threads: 1 # overidden by profile config, but required...
@@ -664,7 +699,7 @@ rule busco:
     busco -m genome \
         -c {threads} \
         --auto-lineage-prok \
-        --download_path $current_dir/databases/busco_lineages \
+        --download_path {config['database_path']}/busco_lineages \
         --out_path $TMPDIR \
         --offline \
         -o {wildcards.sample} \

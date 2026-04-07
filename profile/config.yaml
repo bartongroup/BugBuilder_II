@@ -1,12 +1,13 @@
 snakefile: workflow/Snakefile
 software-deployment-method: apptainer
+apptainer-args: "--bind /cluster/nrsw_lab/jabbott/databases"
 latency-wait: 60
 show-failed-logs: True
 keep-going: True
 printshellcmds: True
 rerun-incomplete: True
 skip-script-cleanup: True
-jobname: "assembly_{rule}.{jobid}"
+jobname: "BugBuilder_{rule}.{jobid}"
 jobs:  200
 ## DRMAA plugin config
 executor: drmaa

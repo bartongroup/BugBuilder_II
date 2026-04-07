@@ -4,6 +4,7 @@
 Downloads BUSCO bacterial lineages 
 """
 
+import argparse
 from io import StringIO
 from multiprocessing import Pool
 from pathlib import Path
@@ -14,8 +15,6 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import requests
 from requests.adapters import HTTPAdapter, Retry
-
-DB_DIR = "databases/busco_lineages/"
 
 def make_request(uri):
 
@@ -90,7 +89,7 @@ def get_available_files(lineages):
     
     return(files)
 
-def download_file(file):
+def download_file(database_dir, file):
 
     """ 
     Downloads tar section using requests and expands
@@ -103,10 +102,10 @@ def download_file(file):
     """
 
     url = f"https://busco-data.ezlab.org/v5/data/lineages/{file}"
-    local_filename = Path(f'{DB_DIR}/{file}')
+    local_filename = Path(f'{database_dir}/{file}')
     lineage = file.split(".")[0]
 
-    if not Path(f'{DB_DIR}/{lineage}').exists():
+    if not Path(f'{database_dir}/{lineage}').exists():
         try:
             with requests.get(url, stream=True, timeout=60) as r:
                 r.raise_for_status()
@@ -117,32 +116,39 @@ def download_file(file):
                 print(f"Exception: {url} - {errex}")
                 return
     
-    with tarfile.open(f"{DB_DIR}/{file}", "r") as handle:
-        handle.extractall(path=f'{DB_DIR}/', filter="data") 
+    with tarfile.open(f"{database_dir}/{file}", "r") as handle:
+        handle.extractall(path=f'{database_dir}/', filter="data") 
     
     os.remove(local_filename)
 
 def main():
     """ Main process """
 
+    parser = argparse.ArgumentParser(
+        prog = "download_busco_lineages.py",
+        description="Downloads busco lineages, and unpacks"
+    )
+    parser.add_argument('-d', '--database_dir', action='store', dest="database_dir", required=True)
+    args = parser.parse_args()
+
+    database_dir = f'{args.database_dir}/busco_lineages'
+
     try:
-        Path('databases/busco_lineages').mkdir(exist_ok=True)
+        Path(database_dir).mkdir(exist_ok=True)
     except FileExistsError as e:
         print(e)
-
 
     lineages = get_available_lineages()
     files = get_available_files(lineages)
 
     pool = Pool(4)
     try:
-        results = pool.map(download_file, files)
+        results = pool.starmap(download_file, [(database_dir, file) for file in files])
     except requests.exceptions.RequestException as e:
         print(f'Download failed: {e}')
 
     pool.close()
     pool.join()
-
 
 if __name__ == "__main__":
     main()

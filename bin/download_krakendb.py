@@ -12,9 +12,6 @@ import threading
 
 import requests
 
-DB_DIR = "databases/kraken2/"
-
-
 def Handler(start, end, url, filename):
     """
     Handler function for each thread to download a part of the file
@@ -30,12 +27,13 @@ def Handler(start, end, url, filename):
     """
     headers = {'Range': f'bytes={start}-{end}'}
     r = requests.get(url, headers=headers, stream=True)
-
+    print(f"Downloading bytes {start} to {end} from {url} to {filename}")
     with open(filename, "r+b") as fp:
         fp.seek(start)
         for chunk in r.iter_content(chunk_size=1024 * 1024):
             if chunk:
                 fp.write(chunk)
+    print(f"Finished downloading bytes {start} to {end} from {url} to {filename}")
 
 def download_file(url_of_file, name, number_of_threads):
     """
@@ -90,23 +88,26 @@ def main():
     """ Main process """
 
     parser = ArgumentParser(description="Download Kraken2 standard database")
+    parser.add_argument("-d", "--database_dir", help="directory to save database in", required=True)
     parser.add_argument("-v", "--version", help="database version to download", required=True)
     args = parser.parse_args()
 
+    database_dir = f"{args.database_dir}/kraken2"
+
     try:
-        Path(DB_DIR).mkdir(exist_ok=True)
+        Path(database_dir).mkdir(exist_ok=True)
     except FileExistsError as e:
         print(e)
 
     url = f"https://genome-idx.s3.amazonaws.com/kraken/"
     db_url = f"{url}k2_standard_{args.version}.tar.gz"
 
-    local_db_file = Path(f'{DB_DIR}/k2_standard_{args.version}.tar.gz')
+    local_db_file = Path(f'{database_dir}/k2_standard_{args.version}.tar.gz')
 
     download_file(db_url, local_db_file, number_of_threads=16)
 
     with tarfile.open(f"{local_db_file}", "r") as handle:
-        handle.extractall(path=f'{DB_DIR}/', filter="data") 
+        handle.extractall(path=f'{database_dir}/', filter="data") 
 
     os.remove(local_db_file)
 
