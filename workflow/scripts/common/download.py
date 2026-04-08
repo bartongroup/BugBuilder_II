@@ -3,6 +3,10 @@ Common functions for downloading files for databases, including GTDB-Tk, Bakta,
 and BUSCO lineages
  """
 
+from pathlib import Path
+import tarfile
+import os
+
 import threading
 import requests
 from requests.adapters import HTTPAdapter, Retry
@@ -93,6 +97,32 @@ def make_request(uri):
             return r.text
     except requests.exceptions.RequestException as errex:
         print(f"Exception: {uri} - {errex}")
+
+def download_file(download_dir, url):
+
+    """ 
+    Downloads tar section using requests 
+    
+    Required parameters:
+        download_dir(Path): directory to save downloaded file in
+        url(str): url of file to download
+    
+    Returns:
+        None
+    """
+
+    local_filename = Path(url.split('/')[-1])
+    local_filename = download_dir / local_filename
+
+    try:
+        with create_http_session() as s:
+            r = s.get(url, stream=True, timeout=60) 
+            r.raise_for_status()
+            with open(local_filename, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+    except requests.exceptions.RequestException as errex:
+        print(f"Exception: {url} - {errex}")
 
 def download_file_parallel(url_of_file, name, number_of_threads):
     """

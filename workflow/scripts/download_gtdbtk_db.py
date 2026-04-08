@@ -15,66 +15,7 @@ from bs4 import BeautifulSoup
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
-def create_http_session():
-    """
-    Creates HTTP session with retry strategy for requests
-    
-    Required params:
-        None
-
-    Returns:
-        session(requests.Session): HTTP session with retry strategy
-    """
-
-    s = requests.Session()
-    retries = Retry(
-        total=5, 
-        backoff_factor=1, 
-        status_forcelist=[502, 503, 504]
-    )
-    adapter = HTTPAdapter(max_retries=retries)
-    s.mount("https://", adapter)
-    s.mount("http://", adapter)
-
-    return s
-
-def init_worker():
-
-    """
-    Initializes worker for multiprocessing pool using factory function 
-    
-    Required params:
-        None
-
-    Returns:
-        None
-    """
-
-    global session
-    session = create_http_session()
-
-
-def make_request(uri):
-
-    """
-    Makes HTTP request and returns result body
-
-    Required params:
-        uri(str): URI for request
-
-    Returns:
-        text of response
-    """
-
-    try:
-        with create_http_session() as s:
-            r = s.get(uri, timeout=30)
-            r.raise_for_status()
-
-            return r.text
-    except requests.exceptions.RequestException as errex:
-        print(f"Exception: {uri} - {errex}")
-
+from common.download import init_worker, download_file, make_request
 
 def get_gtdbtk_part_list(release):
 
@@ -108,32 +49,6 @@ def get_gtdbtk_part_list(release):
             links.append(part_uri)
 
     return links
-
-def download_file(download_dir, url):
-
-    """ 
-    Downloads tar section using requests 
-    
-    Required parameters:
-        download_dir(str): directory to save downloaded file in
-        url(str): url of file to download
-    
-    Returns:
-        None
-    """
-
-    local_filename = url.split('/')[-1]
-    local_filename = Path(f'{download_dir}/{local_filename}')
-
-    if not local_filename.exists():
-        try:
-            with session.get(url, stream=True, timeout=60) as r:
-                r.raise_for_status()
-                with open(local_filename, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-        except requests.exceptions.RequestException as errex:
-            print(f"Exception: {url} - {errex}")
 
 def unpack(database_dir, download_dir, release):
     """ 
@@ -175,6 +90,7 @@ def unpack(database_dir, download_dir, release):
 def main():
     """ Main process """
 
+    print("Starting GTDB-TK database download and unpacking process")
     parser = argparse.ArgumentParser(
         prog = "download_gtdbtk_db.py",
         description="Downloads split gtdbtk database, merges and unpacks"
@@ -201,11 +117,11 @@ def main():
 
     session = None
 
-    #with multiprocessing.Pool(initializer=init_worker, processes=18) as pool:
-    #    results = pool.starmap(download_file, [(download_dir, url) for url in links])
+    with multiprocessing.Pool(initializer=init_worker, processes=18) as pool:
+        results = pool.starmap(download_file, [(download_dir, url) for url in links])
 
-    #pool.close()
-    #pool.join()
+    pool.close()
+    pool.join()
 
     unpack(database_dir, download_dir, args.release)
 

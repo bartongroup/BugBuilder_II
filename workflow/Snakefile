@@ -1,6 +1,7 @@
 from glob import glob
 import pandas as pd
 import json
+import sys
 
 configfile: "workflow/config/config.yaml"
 
@@ -319,7 +320,7 @@ rule bakta_download:
         database_path = config['database_path']
     log: 'workflow/logs/bakta_db_download.log'
     shell:"""
-export PYTHONPATH=$PYTHONPATH:workflow/scripts
+export PYTHONPATH=workflow/scripts
 workflow/scripts/download_bakta_db.py \
     --database_dir {params.database_path} > {log} 2>&1
 """
@@ -343,10 +344,12 @@ rule gtdb_download:
         gtdb_version = config['gtdb_version']
     log: 'workflow/logs/gtdb_download.log'
     shell: """
-bin/download_gtdbtk_db.py \
+(
+export PYTHONPATH=workflow/scripts
+workflow/scripts/download_gtdbtk_db.py \
     --database_dir {params.database_path} \
     --release {params.gtdb_version} \
-  > {log} 2>&1
+ ) > {log} 2>&1
 """
 
 rule busco_download:
