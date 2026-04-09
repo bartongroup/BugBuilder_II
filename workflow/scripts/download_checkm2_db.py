@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Downloads Baktta database
+Downloads checkm2 database
 """
 
 from pathlib import Path
@@ -21,25 +21,25 @@ from common.download import Handler, download_file_parallel
 def main():
     """ Main process """
 
-    parser = ArgumentParser(description="Download bakta full database")
+    parser = ArgumentParser(description="Download checkm2 database")
     parser.add_argument("-d", "--database_dir", help="directory to save database in", required=True)
     args = parser.parse_args()
 
-    database_dir = f"{args.database_dir}/bakta_db/"
+    database_dir = Path(f"{args.database_dir}/checkm2_db/")
 
     try:
-        Path(database_dir).mkdir(exist_ok=True, parents=True)
+        database_dir.mkdir(exist_ok=True, parents=True)
     except FileExistsError as e:
         print(e)
 
-    db_url = "https://zenodo.org/records/14916843/files/db.tar.xz?download=1"
+    db_url = "https://zenodo.org/records/14897628/files/checkm2_database.tar.gz?download=1"
 
-    local_db_file = Path(f'{database_dir}/bakta.tar.xz')
+    local_db_file = database_dir / Path('checkm2_database.tar.gz ')
 
     download_file_parallel(db_url, local_db_file, number_of_threads=16)
 
-    with tarfile.open(f"{local_db_file}", "r:xz") as handle:
-        handle.extractall(path=f'{database_dir}/', filter="data") 
+    with tarfile.open(f"{local_db_file}", "r") as handle:
+        handle.extractall(path=database_dir, filter="data") 
 
     os.remove(local_db_file)
 

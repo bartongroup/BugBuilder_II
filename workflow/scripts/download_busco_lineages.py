@@ -81,7 +81,7 @@ def main():
     database_dir = Path(f'{args.database_dir}/busco_lineages')
 
     try:
-        database_dir.mkdir(exist_ok=True)
+        database_dir.mkdir(exist_ok=True, parents=True)
     except FileExistsError as e:
         print(e)
 

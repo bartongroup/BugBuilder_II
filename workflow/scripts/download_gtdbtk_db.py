@@ -13,6 +13,7 @@ import tarfile
 
 from bs4 import BeautifulSoup
 import requests
+
 from requests.adapters import HTTPAdapter, Retry
 
 from common.download import init_worker, download_file, make_request
@@ -103,12 +104,12 @@ def main():
     download_dir = Path(f"{args.database_dir}/gtdbtk_download")
 
     try:
-        database_dir.mkdir(exist_ok=True)
+        database_dir.mkdir(exist_ok=True, parents=True)
     except FileExistsError as e:
         print(e)
 
     try:
-        download_dir.mkdir(exist_ok=True)
+        database_dir.mkdir(exist_ok=True, parents=True)
     except FileExistsError as e:
         print(e)
 
