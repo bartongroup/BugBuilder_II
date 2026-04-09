@@ -118,6 +118,7 @@ def download_file(url, name):
         None
     """
 
+    print(f"Downloading {url} to {name}")
     try:
         with create_http_session() as s:
             r = s.get(url, stream=True, timeout=60) 
@@ -127,6 +128,7 @@ def download_file(url, name):
                     f.write(chunk)
     except requests.exceptions.RequestException as errex:
         print(f"Exception: {url} - {errex}")
+        raise
 
 def download_file_parallel(url_of_file, name, number_of_threads):
     """
@@ -200,7 +202,10 @@ def update_db_version(database_dir, database, version, db_type):
             except json.JSONDecodeError:
                 versions = {}
 
-            version_info = {'version': version, 'type': db_type}
+            if db_type is not None:
+                version_info = {'version': version, 'type': db_type}
+            else:
+                version_info = {'version': version}
             versions[database] = version_info
 
             version_file.seek(0)
@@ -208,7 +213,10 @@ def update_db_version(database_dir, database, version, db_type):
             version_file.truncate()
     else:
         with portalocker.Lock(f'{database_dir}/db_versions.json', 'w', timeout=10) as version_file:
-            versions = {database: {'version': version, 'type': db_type}}
+            if db_type is not None:
+                versions = {database: {'version': version, 'type': db_type}}
+            else:
+                versions = {database: {'version': version}}
             json.dump(versions, version_file, indent=4)
 
 
