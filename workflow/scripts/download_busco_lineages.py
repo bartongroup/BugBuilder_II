@@ -6,7 +6,7 @@ Downloads BUSCO bacterial lineages
 
 import argparse
 from io import StringIO
-from multiprocessing import Pool
+import multiprocessing
 from pathlib import Path
 import tarfile
 import os
@@ -16,33 +16,7 @@ import pandas as pd
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
-def make_request(uri):
-
-    """
-    Makes HTTP request and returns result body
-
-    Required params:
-        uri(str): URI for request
-
-    Returns:
-        text of response
-    """
-
-    s = requests.Session()
-
-    retries = Retry(total=10,
-              backoff_factor=2,
-              status_forcelist=[ 500, 502, 504 ],
-              raise_on_status=True)
-
-    s.mount('https://', HTTPAdapter(max_retries=retries))
-
-    try:
-        r = s.get(uri, timeout=30)
-    except requests.exceptions.RequestException as errex:
-        print(f"Exception: {uri} - {errex}")
-
-    return r.text
+from common.download import init_worker, download_file, make_request
 
 def get_available_lineages():
 
@@ -81,45 +55,18 @@ def get_available_files(lineages):
     """
     uri="https://busco-data.ezlab.org/v5/data/lineages/"
     text = make_request(uri)
-    soup = BeautifulSoup(text, 'html.parser')
-    links = soup.find_all('a')
 
-    files = [link.get('href') for link in links if link.get('href')]
-    files = [file for file in files if any(lineage in file for lineage in lineages)]
-    
-    return(files)
+    if text:
+        soup = BeautifulSoup(text, 'html.parser')
+        links = soup.find_all('a')
 
-def download_file(database_dir, file):
-
-    """ 
-    Downloads tar section using requests and expands
+        files = [link.get('href') for link in links if link.get('href')]
+        files = [file for file in files if any(lineage in file for lineage in lineages)]
     
-    Required parameters:
-        file(str): url of file to download
-    
-    Returns:
-        None
-    """
-
-    url = f"https://busco-data.ezlab.org/v5/data/lineages/{file}"
-    local_filename = Path(f'{database_dir}/{file}')
-    lineage = file.split(".")[0]
-
-    if not Path(f'{database_dir}/{lineage}').exists():
-        try:
-            with requests.get(url, stream=True, timeout=60) as r:
-                r.raise_for_status()
-                with open(local_filename, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-        except requests.exceptions.RequestException as errex:
-                print(f"Exception: {url} - {errex}")
-                return
-    
-    with tarfile.open(f"{database_dir}/{file}", "r") as handle:
-        handle.extractall(path=f'{database_dir}/', filter="data") 
-    
-    os.remove(local_filename)
+        return(files)
+    else:
+        print(f"Failed to retrieve directory index from {uri}")
+        return []
 
 def main():
     """ Main process """
@@ -131,21 +78,20 @@ def main():
     parser.add_argument('-d', '--database_dir', action='store', dest="database_dir", required=True)
     args = parser.parse_args()
 
-    database_dir = f'{args.database_dir}/busco_lineages'
+    database_dir = Path(f'{args.database_dir}/busco_lineages')
 
     try:
-        Path(database_dir).mkdir(exist_ok=True)
+        database_dir.mkdir(exist_ok=True)
     except FileExistsError as e:
         print(e)
 
     lineages = get_available_lineages()
     files = get_available_files(lineages)
 
-    pool = Pool(4)
-    try:
+    session = None
+
+    with multiprocessing.Pool(initializer=init_worker, processes=16) as pool:
         results = pool.starmap(download_file, [(database_dir, file) for file in files])
-    except requests.exceptions.RequestException as e:
-        print(f'Download failed: {e}')
 
     pool.close()
     pool.join()
