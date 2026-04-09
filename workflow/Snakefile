@@ -165,7 +165,7 @@ for sample in SAMPLES:
     else:
         SHORT_SAMPLES.append(sample)
 
-BAKTA_DB_PATH = f"{config['database_path']}/bakta_db/db"
+BAKTA_DB_PATH = f"{config['database_path']}/bakta_db/"
 
 # Bakta database consists of multiple files with different extensions depending on the type of data
 BAKTA_DB_MAP = {
@@ -295,12 +295,16 @@ rule bakta_download:
     input: 'workflow/scripts/download_bakta_db.py'
     output: BAKTA_DB
     params:
-        database_path = config['database_path']
+        database_path    = config['database_path']
+        database_version = config['bakta_db_version'],
+        database_type    = config['bakta_db_type']
     log: 'workflow/logs/bakta_db_download.log'
     shell:"""
 export PYTHONPATH=workflow/scripts
 workflow/scripts/download_bakta_db.py \
-    --database_dir {params.database_path} > {log} 2>&1
+    --database_dir     {params.database_path} \
+    --database_version {params.database_version} \
+    --database_type    {params.database_type} > {log} 2>&1
 """
 
 rule amrfinder_download:

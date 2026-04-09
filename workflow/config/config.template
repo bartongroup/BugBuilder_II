@@ -7,6 +7,8 @@ long_read_instrument: # Sequencing platform used for long reads, e.g. "Oxford Na
 genome_size: # estimated mean size of genomes in base pairs
 gram: '+' # or '-'
 # Database versions
+bakta_db_version: 'latest'
+bakta_db_type: 'light' # Options: 'full' or 'light'
 gtdb_version: '226'
 kraken_db_version: '20260226'
 # Container images for each tool
