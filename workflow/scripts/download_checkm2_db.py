@@ -39,7 +39,17 @@ def main():
     download_file_parallel(db_url, local_db_file, number_of_threads=16)
 
     with tarfile.open(f"{local_db_file}", "r") as handle:
-        handle.extractall(path=database_dir, filter="data") 
+        # Strip the leading directory from the member names
+        members = []
+        for member in handle.getmembers():
+            parts = member.name.split(os.sep)
+            
+            if len(parts) > 1:
+                member.name = os.path.join(*parts[1:])
+                members.append(member)
+        
+        # Extract only the modified members
+        handle.extractall(path=database_dir, members=members, filter="data")
 
     os.remove(local_db_file)
 

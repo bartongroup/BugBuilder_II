@@ -343,19 +343,14 @@ touch {output}
 """
 
 rule checkm2_download:
+    input: 'workflow/scripts/download_checkm2_db.py'
     output: CHECKM2_DB
     params:
         database_path = config['database_path']
     log: 'workflow/logs/checkm2_download.log'
     shell: """
-    ( mkdir -pv {params.database_path}/checkm2_db
-      wget https://zenodo.org/records/14897628/files/checkm2_database.tar.gz?download=1 \
-        -O {params.database_path}/checkm2_db/checkm2_database.tar.gz
-      tar -xzvf {params.database_path}/checkm2_db/checkm2_database.tar.gz \
-        -C {params.database_path}/checkm2_db/ \
-        --strip-components=1
-      rm -fv {params.database_path}/checkm2_db/checkm2_database.tar.gz ) \
-    > {log} 2>&1
+export PYTHONPATH=workflow/scripts
+workflow/scripts/download_checkm2_db.py --database_dir {params.database_path} > {log} 2>&1
 """
 
 rule fastqc:
