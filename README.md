@@ -15,21 +15,25 @@ versions of software provided via Docker, while clearly reporting all versions
 of software used, which should be cited in any publications utilising it's
 outputs.
 
-The software requires a number of databases, which will be automatically downloaded as required. Note that these will require ~650 Gb disk space. 
+The software requires a number of databases, which will be automatically
+downloaded as required. Note that these will require ~650 Gb disk space. 
 
 TODO: Use centralised database and docker cache directories to ease reuse
 
-## Quick start guide for those familiar with git and conda
+## Quick start guide for those familiar with git and pixi
 
-Note that the configuration is currently configured to use a GridEngine based compute cluster with DRMAA. Changes will probably be required to support other environments, which will need to be made in the Snakemake `profile/config.yaml`.
+Note that the configuration is currently configured to use a GridEngine based
+compute cluster with DRMAA. Changes will probably be required to support other
+environments, which will need to be made in the Snakemake `profile/config.yaml`.
 
 1. Clone this repository and change into the resulting directory
 
-2. Create a conda environment: `conda create -f etc/conda.yaml`
+2. Recreate the software environment: `pixi install`
 
-3. Activate the environment: `conda activate BugBuilder_II`
-
-4. Setup your data. Create a `data` subdirectory, within which a directory for each sample (named with the sample name) should be created. Sequence reads should be placed in directories within these per-sample directories named 'short_reads' and (optionally) 'long_reads', as illustrated below.
+3. Setup your data. Create a `data` subdirectory, within which a directory for
+each sample (named with the sample name) should be created. Sequence reads
+should be placed in directories within these per-sample directories named
+'short_reads' and (optionally) 'long_reads', as illustrated below.
 
 ```
 data
@@ -47,31 +51,37 @@ data
 
 5. Tweak the configuration: See workflow configuration below
 
-6. Run the workflow: `bin/run_workflow.sh`
+6. Run the workflow: `pixi run ./run.sh`
 
 ## Installation - the long version
 
 A separate copy of the workflow should be created for each analysis to be
-conducted. A small conda environment is required containing the core workflow
-management components, which is reusable across different copies of the
-workflow.
+conducted. Pixi is used for creating the softawre environment containing the
+core packages required for executing the workflow.
 
-The workflow has been implemented on Linux, and may work ok on MacOS, but is
-untested. YMMV...
+The workflow has been implemented and tested on Linux. It may work on MacOS, but
+is untested.  YMMV...
 
-1. **Software Prerequisites**: Ensure you have conda and git available. If you don't have conda, head [here](https://docs.conda.io/en/latest/) to obtain the appropriate downoader for your platform, and follow it's installation instructions. You probably want the mambaforge installer rather than miniforge, which has commercial licensing implications
+1. **Software Prerequisites**: Ensure you have git and (preferably) pixi or
+conda available. If you don't have pixi, head
+[here](https://docs.conda.io/en/latest/) to obtain the appropriate downoader for
+your platform, and follow it's installation instructions. You probably want the
+mambaforge installer rather than miniforge, which has commercial licensing
+implications
 
-2. **Clone this repository**: Select a directory name to save this to, and clone the repository with `git clone https://github.com/bartongroup/BugBuilder_II.git my_workflow_dir`
+2. **Clone this repository**: Select a directory name to save this to, and clone
+the repository with `git clone https://github.com/bartongroup/BugBuilder_II.git
+my_workflow_dir`
 
 3. **Change into the checkout directory**: `cd my_workflow_dir`
 
-4. **Create the conda environment** This is a one-time operation which creates the environment containing the necessary workflow software: `conda env create -f etc/conda.yaml`
-
-
+4. **Create the conda environment** This creates the environment containing the
+necessary workflow software: `pixi install`. Alternatively, for conda, run
+`conda env create -f etc/conda.yaml`.
 
 ### Workflow Directory Structure and Configuration
 
-The workflow follows old-fashion Unix conventions for directory naming. The only script needing running directly is the `bin/run_workflow.sh` script, which starts the process going, once setup and configured. 
+The workflow follows old-fashion Unix conventions for directory naming. The only script needing running directly is the `run.sh` script, which starts the process going, once setup and configured. 
 ```
 .
 ├── bin
