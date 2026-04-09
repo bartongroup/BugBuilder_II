@@ -1,9 +1,28 @@
 database_path: 'databases'
 project_id: ## ENA/GenBank ID, e.g. "PRJNA...."
-genome_size: # estimated size of genome in base pairs
-gram: '+' # or '-'
-gtdb_version: '226'
-kraken_db_version: '20260226'
 # Following lines are for completing manifests. 
 short_read_instrument: # Sequencing platform used for short reads, e.g. "Illumina MiSeq"
 long_read_instrument: # Sequencing platform used for long reads, e.g. "Oxford Nanopore MinION"
+# Organism characteristics
+genome_size: # estimated mean size of genomes in base pairs
+gram: '+' # or '-'
+# Database versions
+gtdb_version: '226'
+kraken_db_version: '20260226'
+# Container images for each tool
+containers:
+  fastp:     "docker://quay.io/biocontainers/fastp:1.1.0--heae3180_0"
+  fastqc:    "docker://quay.io/biocontainers/fastqc:0.12.1--hdfd78af_0"
+  chopper:   "docker://quay.io/biocontainers/chopper:0.12.0--hcdda2d0_0"
+  nanostat:  "docker://quay.io/biocontainers/nanostat:1.6.0--pyhdfd78af_0"
+  kraken2:   "docker://quay.io/biocontainers/kraken2:2.17.1--pl5321h077b44d_0"
+  spades:    "docker://simonbrandt/spades:v4.2.0"
+  flye:      "docker://quay.io/biocontainers/flye:2.9.6--py311h2de2dd3_0"
+  unicycler: "docker://quay.io/biocontainers/unicycler:0.5.1--py39h746d604_5"
+  bakta:     "docker://quay.io/biocontainers/bakta:1.12.0--pyhdfd78af_0"
+  blast:     "docker://quay.io/biocontainers/blast:2.17.0--h66d330f_0"
+  gtdbtk:    "docker://quay.io/biocontainers/gtdbtk:2.6.1--pyh1f0d9b5_2"
+  checkm2:   "docker://quay.io/biocontainers/checkm2:1.1.0--pyh7e72e81_1"
+  busco:     "docker://ezlabgva/busco:v6.0.0_cv1"
+  quast:     "docker://quay.io/biocontainers/quast:5.3.0--py313pl5321h5ca1c30_2"
+  multiqc:   "docker://quay.io/biocontainers/multiqc:1.33--pyhdfd78af_0"
