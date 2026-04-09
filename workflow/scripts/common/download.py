@@ -200,7 +200,8 @@ def update_db_version(database_dir, database, version, db_type):
             except json.JSONDecodeError:
                 versions = {}
 
-            versions[database] = version
+            version_info = {'version': version, 'type': db_type}
+            versions[database] = version_info
 
             version_file.seek(0)
             json.dump(versions, version_file, indent=4)
