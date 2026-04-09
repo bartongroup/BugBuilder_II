@@ -165,7 +165,7 @@ for sample in SAMPLES:
     else:
         SHORT_SAMPLES.append(sample)
 
-BAKTA_DB_PATH = f"{config['database_path']}/bakta_db/"
+BAKTA_DB_PATH = f"{config['database_path']}/bakta_db"
 
 # Bakta database consists of multiple files with different extensions depending on the type of data
 BAKTA_DB_MAP = {
@@ -281,21 +281,22 @@ rule kraken_db_download:
     output: KRAKEN_DB
     params:
         database_path = config['database_path'],
-        kraken_db_version = config['kraken_db_version']
+        kraken_db_version = config['kraken_db_version'],
+        kraken_db_type = config['kraken_db_type']
     log: 'workflow/logs/kraken_db_download.log'
     shell:"""
 export PYTHONPATH=workflow/scripts
-mkdir -p {params.database_path}/kraken2
 workflow/scripts/download_krakendb.py \
     --database_dir {params.database_path} \
-    --version {params.kraken_db_version} > {log} 2>&1
+    --database_version {params.kraken_db_version} \
+    --database_type {params.kraken_db_type} > {log} 2>&1
 """
 
 rule bakta_download:
     input: 'workflow/scripts/download_bakta_db.py'
     output: BAKTA_DB
     params:
-        database_path    = config['database_path']
+        database_path    = config['database_path'],
         database_version = config['bakta_db_version'],
         database_type    = config['bakta_db_type']
     log: 'workflow/logs/bakta_db_download.log'

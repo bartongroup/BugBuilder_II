@@ -12,7 +12,6 @@ import sys
 import threading
 import json
 
-import portalocker
 import requests
 
 script_dir = Path(__file__).parent.resolve()
@@ -29,7 +28,7 @@ def main():
     parser.add_argument("-t", "--database_type", help="database type to download (full or light)", default='light')
     args = parser.parse_args()
 
-    database_dir = Path(f"{args.database_dir}/bakta_db/")
+    database_dir = Path(f"{args.database_dir}/bakta_db")
 
     try:
         database_dir.mkdir(exist_ok=True, parents=True)
