@@ -29,7 +29,7 @@ def main():
     database_dir = Path(f"{args.database_dir}/kraken2")
 
     try:
-        database_dir.mkdir(exist_ok=True)
+        database_dir.mkdir(exist_ok=True, parents=True)
     except FileExistsError as e:
         print(e)
 
