@@ -339,11 +339,15 @@ rule busco_download:
     input: 'workflow/scripts/download_busco_lineages.py'
     output: BUSCO_DB
     params:
-        database_path = config['database_path']
+        database_path = config['database_path'],
+        database_version = config['busco_dataset']
     log: 'workflow/logs/busco_download.log'
     shell: """
 export PYTHONPATH=workflow/scripts
-workflow/scripts/download_busco_lineages.py --database_dir {params.database_path} > {log} 2>&1
+workflow/scripts/download_busco_lineages.py \
+  --database_dir {params.database_path} \
+  --database_version {params.database_version} \
+  > {log} 2>&1
 touch {output}
 """
 
