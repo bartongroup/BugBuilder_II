@@ -298,7 +298,11 @@ def get_zenodo_download_url(record_id, type):
             file_name = 'db.tar.xz'
         else:
             file_name = 'db-light.tar.xz'
-
+    elif 'checkm2' in caller_filename:
+        file_name = 'checkm2_database.tar.gz'
+    else:
+        raise ValueError("Unknown database type based on calling script.")
+    print(f"Looking for file {file_name} in Zenodo record {record_id}")
     base_url = "https://zenodo.org/api/records/"
     uri = f"{base_url}{record_id}"
 

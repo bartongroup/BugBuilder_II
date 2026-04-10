@@ -355,11 +355,15 @@ rule checkm2_download:
     input: 'workflow/scripts/download_checkm2_db.py'
     output: CHECKM2_DB
     params:
-        database_path = config['database_path']
+        database_path = config['database_path'],
+        database_version = config['checkm2_db_version']
     log: 'workflow/logs/checkm2_download.log'
     shell: """
 export PYTHONPATH=workflow/scripts
-workflow/scripts/download_checkm2_db.py --database_dir {params.database_path} > {log} 2>&1
+workflow/scripts/download_checkm2_db.py \
+  --database_dir {params.database_path} \
+  --database_version {params.database_version} \
+  > {log} 2>&1
 """
 
 rule fastqc:

@@ -13,6 +13,7 @@ gtdb_version: '226'
 kraken_db_version: '20260226' # See https://benlangmead.github.io/aws-indexes/k2nife/ for available versions
 kraken_db_type: 'standard-16' # Options: 'standard', 'standard-16' or 'standard-8'
 busco_dataset: 'odb12'
+checkm2_db_version: 'latest'
 # Container images for each tool
 containers:
   fastp:     "docker://quay.io/biocontainers/fastp:1.1.0--heae3180_0"
