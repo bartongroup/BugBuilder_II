@@ -9,7 +9,7 @@ gram: '+' # or '-'
 # Database versions
 bakta_db_version: 'latest'
 bakta_db_type: 'light' # Options: 'full' or 'light'
-gtdb_version: '226'
+gtdb_version: 'latest'
 kraken_db_version: '20260226' # See https://benlangmead.github.io/aws-indexes/k2nife/ for available versions
 kraken_db_type: 'standard-16' # Options: 'standard', 'standard-16' or 'standard-8'
 busco_dataset: 'odb12'

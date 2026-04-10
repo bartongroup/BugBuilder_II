@@ -316,11 +316,13 @@ rule amrfinder_download:
     log: 'workflow/logs/amrfinder_db_download.log'
     container: containers["bakta"]
     shell:"""
-    amrfinder_update --database {params.database_path}/bakta_db/db/amrfinderplus-db/ \
+    amrfinder_update --database {params.database_path}/bakta_db/amrfinderplus-db/ \
         > {log} 2>&1
+    echo "exit status: $?" >> {log}
 """
 
 rule gtdb_download:
+    input: 'workflow/scripts/download_gtdbtk_db.py'
     output: GTDB
     params:
         database_path = config['database_path'],
@@ -331,7 +333,7 @@ rule gtdb_download:
 export PYTHONPATH=workflow/scripts
 workflow/scripts/download_gtdbtk_db.py \
     --database_dir {params.database_path} \
-    --release {params.gtdb_version} \
+    --database_version {params.gtdb_version} \
  ) > {log} 2>&1
 """
 
@@ -585,7 +587,7 @@ rule bakta:
     threads: 1 # overidden by profile config, but required...
     shell:"""
         bakta \
-        --db {params.database_path}/bakta_db/db \
+        --db {params.database_path}/bakta_db/ \
         --prefix {wildcards.sample} \
         --output results/annotated/{wildcards.sample} \
         --threads {threads} \

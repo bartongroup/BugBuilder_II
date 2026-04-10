@@ -16,7 +16,27 @@ import requests
 
 from requests.adapters import HTTPAdapter, Retry
 
-from common.download import init_worker, download_file, make_request
+from common.download import init_worker, download_file, make_request, update_db_version
+
+def get_latest_release(release):
+
+    url = "https://data.gtdb.aau.ecogenomic.org/releases/"
+
+    result = make_request(url)
+    if result:
+        soup = BeautifulSoup(result, 'html.parser')
+
+        versions = []
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            if str(href).startswith('release'):
+                versions.append(str(href).replace('release', '').rstrip('/'))
+        
+        versions = sorted(versions)
+        if len(versions) > 0:
+            return versions[-1].rstrip('/')
+    
+    raise RuntimeError("Failed to retrieve GTDB-TK releases from GTDB website.")
 
 def get_gtdbtk_part_list(release):
 
@@ -63,6 +83,8 @@ def unpack(database_dir, download_dir, release):
     Returns:
         None
     """
+    print(f"Looking for split files in {download_dir} with pattern gtdbtk_r{release}_data.tar.gz.part*")
+    print(f"Files found: {list(download_dir.glob(f'gtdbtk_r{release}_data.tar.gz.part*'))}")
 
     parts = [str(p) for p in sorted(download_dir.glob(f"gtdbtk_r{release}_data.tar.gz.part*"))]
     if not parts:
@@ -97,34 +119,45 @@ def main():
         description="Downloads split gtdbtk database, merges and unpacks"
     )
     parser.add_argument('-d', '--database_dir', action='store', dest="database_dir", required=True)
-    parser.add_argument('-r', '--release', action='store', dest="release", required=True)
+    parser.add_argument('-v', '--database_version', action='store', dest="database_version", required=True)
 
     args = parser.parse_args()
     database_dir = Path(f"{args.database_dir}/gtdbtk")
     download_dir = Path(f"{args.database_dir}/gtdbtk_download")
 
+    if args.database_version != 'latest' and not args.database_version.isdigit():
+        raise ValueError("Invalid database version. Must be 'latest' or a number corresponding to GTDB release.")
+    
+    if args.database_version == 'latest':
+        release = get_latest_release(args.database_version)
+    else:
+        release = args.database_version
+
+    print("GTDB-TK release to download: ", release)
     try:
         database_dir.mkdir(exist_ok=True, parents=True)
     except FileExistsError as e:
         print(e)
 
     try:
-        database_dir.mkdir(exist_ok=True, parents=True)
+        download_dir.mkdir(exist_ok=True, parents=True)
     except FileExistsError as e:
         print(e)
 
-    links = get_gtdbtk_part_list(args.release)
+    links = get_gtdbtk_part_list(release)
     print(f"Found {len(links)} parts to download")
 
     session = None
 
     with multiprocessing.Pool(initializer=init_worker, processes=18) as pool:
-        results = pool.starmap(download_file, [(download_dir, url) for url in links])
+        results = pool.starmap(download_file, [(url,  f"{download_dir}/{url.split('/')[-1]}") for url in links])
 
     pool.close()
     pool.join()
 
-    unpack(database_dir, download_dir, args.release)
+    unpack(database_dir, download_dir, release)
+
+    update_db_version(args.database_dir, 'gtdbtk', release, None)
 
 if __name__ == "__main__":
     main()
