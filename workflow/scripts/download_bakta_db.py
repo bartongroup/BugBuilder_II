@@ -35,7 +35,7 @@ def main():
     except FileExistsError as e:
         print(e)
 
-    record_id, version = get_zenodo_db_version('10.5281/zenodo.4247252', 'latest')
+    record_id, version = get_zenodo_db_version('10.5281/zenodo.4247252', args.database_version)
     bakta_url = get_zenodo_download_url(record_id, args.database_type)
 
     local_db_file = Path(f'{database_dir}/bakta.tar.xz')
