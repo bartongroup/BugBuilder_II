@@ -41,7 +41,7 @@ def main():
     local_db_file = Path(f'{database_dir}/bakta.tar.xz')
 
     if type == 'full':
-        download_file_parallel(bakta_url, local_db_file, number_of_threads=16)
+        download_file_parallel(bakta_url, local_db_file, number_of_threads=8)
     else:
         download_file(bakta_url, local_db_file)
 
