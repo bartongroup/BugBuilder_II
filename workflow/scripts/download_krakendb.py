@@ -54,7 +54,7 @@ def main():
     with tarfile.open(f"{local_db_file}", "r") as handle:
         handle.extractall(path=f'{database_dir}/', filter="data") 
     
-    update_db_version(args.database_dir, 'kraken', args.database_version, args.database_type)
+    update_db_version(args.database_dir, 'kraken2', args.database_version, args.database_type)
 
     os.remove(local_db_file)
 
