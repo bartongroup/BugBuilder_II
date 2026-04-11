@@ -212,7 +212,7 @@ KRAKEN_DB = ( [f"{KRAKEN_DB_PATH}/database{kmers}mers.kmer_distrib" for kmers in
               [f"{KRAKEN_DB_PATH}/{tsv}.tsv" for tsv in KRAKEN_DB_MAP["tsv"]] +
               [f"{KRAKEN_DB_PATH}/seqid2taxid.map"] )
 
-BUSCO_DB   = f"{config['database_path']}/busco_lineages/download.complete"
+BUSCO_DB   = f"{config['database_path']}/busco/download.complete"
 CHECKM2_DB = f"{config['database_path']}/checkm2_db/uniref100.KO.1.dmnd"
 
 # Way too many files in GTDB to list them all, so just one as a target
@@ -682,8 +682,10 @@ gtdbtk classify_wf \
 rule busco:
     input: 
         assembly = get_assembly_path,
-        database = "{config['database_path']}/busco_lineages/download.complete"
+        database = BUSCO_DB
     output: "results/busco/short_summary_{sample}.txt"
+    params:
+        database_path = config['database_path'] 
     container: containers["busco"]
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/busco_{sample}.log'
@@ -694,9 +696,8 @@ rule busco:
     busco -m genome \
         -c {threads} \
         --auto-lineage-prok \
-        --download_path {config['database_path']}/busco_lineages \
+        --download_path {params.database_path}/busco \
         --out_path $TMPDIR \
-        --offline \
         -o {wildcards.sample} \
         -i assembly.fasta \
         -f >> $current_dir/{log} 2>&1
@@ -759,12 +760,40 @@ rule quast:
         {input.assembly} > {log} 2>&1
 """
 rule software_versions:
+    input: f"{config['database_path']}/db_versions.json"
     output: 'results/software_mqc_versions.yaml'
+    params: 
+        database_path = config['database_path']
+    log: 'workflow/logs/software_versions.log'
     run:
-        with open(output[0], 'w') as f:
-            for name, container in containers.items():
-                version = container.split(':')[-1].split('--')[0]
-                f.write(f"{name}: {version}\n")
+        with open(log[0], 'w') as log_file:
+            json_file = params.database_path + "/db_versions.json"
+            print(f"Collecting software versions from file: {json_file}", file=log_file)
+
+            with open(f'{params.database_path}/db_versions.json') as f:
+                db_versions = json.load(f)
+
+            print("\nLoaded database versions:", file=log_file)
+            for name, version in db_versions.items():
+                print(f"  {name}: {version}", file=log_file)
+
+            with open(output[0], 'w') as f:
+                for name, container in containers.items():
+                    version = container.split(':')[-1].split('--')[0]
+
+                    db_version = None
+                    db_type = None
+
+                    if name in db_versions:
+                        db_version = db_versions[name].get('version')
+                        db_type = db_versions[name].get('type')
+
+                    if db_type is not None and db_version is not None:
+                        version += f" (database: {db_version} [{db_type}])"
+                    elif db_version is not None:
+                         version += f" (database: {db_version})"
+
+                    f.write(f"{name}: '{version}'\n")
 
 rule multiqc:
     input:
