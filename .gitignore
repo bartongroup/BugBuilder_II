@@ -2,6 +2,7 @@
 !.gitignore
 ~*
 
+apptainer_images
 data
 databases
 drmaa_logs

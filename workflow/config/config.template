@@ -1,4 +1,5 @@
 database_path: 'databases'
+apptainer_cache: 'apptainer_images'
 project_id: ## ENA/GenBank ID, e.g. "PRJNA...."
 # Following lines are for completing manifests. 
 short_read_instrument: # Sequencing platform used for short reads, e.g. "Illumina MiSeq"
