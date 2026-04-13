@@ -18,8 +18,6 @@ outputs.
 The software requires a number of databases, which will be automatically
 downloaded as required. Note that these will require ~650 Gb disk space. 
 
-TODO: Use centralised database and docker cache directories to ease reuse
-
 ## Quick start guide for those familiar with git and pixi
 
 Note that the configuration is currently configured to use a GridEngine based
@@ -223,50 +221,52 @@ flowchart TB
 	style id23 fill:#57D9A7,stroke-width:2px,color:#333333
 	style id24 fill:#5793D9,stroke-width:2px,color:#333333
 	style id25 fill:#57D9BB,stroke-width:2px,color:#333333
-	id10 --> id0
-	id14 --> id0
-	id12 --> id0
-	id1 --> id0
-	id17 --> id0
 	id25 --> id0
+	id14 --> id0
+	id16 --> id0
+	id17 --> id0
+	id10 --> id0
+	id1 --> id0
 	id19 --> id0
 	id20 --> id0
-	id16 --> id0
-	id2 --> id1
+	id12 --> id0
 	id6 --> id1
 	id4 --> id1
+	id2 --> id1
 	id3 --> id2
 	id5 --> id4
-	id7 --> id6
 	id8 --> id6
+	id7 --> id6
 	id3 --> id6
-	id7 --> id8
 	id9 --> id8
+	id7 --> id8
 	id7 --> id9
 	id11 --> id10
 	id1 --> id11
-	id2 --> id12
 	id6 --> id12
 	id13 --> id12
-	id2 --> id14
+	id2 --> id12
 	id6 --> id14
+	id2 --> id14
 	id15 --> id14
 	id2 --> id16
-	id6 --> id16
 	id3 --> id16
-	id18 --> id17
-	id2 --> id17
+	id1 --> id16
+	id6 --> id16
+	id12 --> id16
 	id6 --> id17
+	id2 --> id17
+	id18 --> id17
 	id14 --> id20
+	id22 --> id20
+	id3 --> id20
+	id17 --> id20
+	id16 --> id20
+	id1 --> id20
+	id19 --> id20
+	id24 --> id20
 	id12 --> id20
 	id21 --> id20
-	id22 --> id20
-	id1 --> id20
-	id17 --> id20
-	id24 --> id20
-	id3 --> id20
-	id19 --> id20
-	id16 --> id20
 	id23 --> id22
 	id3 --> id22
 	id16 --> id25

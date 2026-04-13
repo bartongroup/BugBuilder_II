@@ -1,9 +1,9 @@
 snakefile: workflow/Snakefile
 software-deployment-method: apptainer
-apptainer-args: "--bind /cluster/nrsw_lab/jabbott/databases"
+apptainer-args: "--bind /cluster/gjb_lab/jabbott/Projects/BugBuilder_II/databases"
 latency-wait: 60
 show-failed-logs: True
-keep-going: True
+keep-going: False
 printshellcmds: True
 rerun-incomplete: True
 skip-script-cleanup: True
@@ -13,8 +13,11 @@ jobs:  200
 executor: drmaa
 drmaa-log-dir: drmaa_logs
 drmaa-args: >
-  -cwd -j y -pe smp {threads}
+  -cwd -j y -pe smp {threads} -mods l_hard mfree {resources.mem_mb}M
 ## Job Resources
+default-resources:
+  - threads=1
+  - mem_mb=8000
 set-threads:
   fastp: 4
   chopper: 4
@@ -38,6 +41,3 @@ set-resources:
     mem_mb: 32000
 
 
-default-resources:
-  - threads=1
-  - mem_mb=4000
