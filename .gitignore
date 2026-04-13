@@ -1,0 +1,19 @@
+.*
+!.gitignore
+~*
+
+data
+databases
+drmaa_logs
+results
+workflow/logs
+workflow/reports
+workflow/config/config.yaml
+workflow/config/runs.csv
+workflow/config/samples.csv
+workflow/scripts/common/__pycache__
+ENA_submission
+test
+# pixi environments
+.pixi/*
+!.pixi/config.toml
