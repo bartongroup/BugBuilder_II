@@ -1,5 +1,7 @@
 # Helper functions used directly dwithin workflow
 import os
+import json
+import pandas as pd
 
 def get_spades_mode(wildcards, config, input):
     """
@@ -92,8 +94,13 @@ def get_fastp_stats(fastp_json, log):
     with open(log[0], 'a') as log_file:
         log_file.write(f"Extracting fastp stats from {fastp_json}\n")
 
-        with open(fastp_json) as f:
-            data = json.load(f)
+        try:
+            with open(fastp_json) as f:
+                data = json.load(f)
+                log_file.write("fastp JSON report loaded successfully.\n")
+        except Exception as e:
+            log_file.write(f"Error loading fastp JSON report: {e}\n")
+            return {}
 
         stats = {
             "total_bases": int(data['summary']['after_filtering']['total_bases']),
@@ -120,13 +127,12 @@ def get_nanostat_stats(nanostat_report, log):
     with open(log[0], 'a') as log_file:
         log_file.write(f"Extracting NanoStat stats from {nanostat_report}\n")
 
-
         nanostat_df = pd.read_csv(nanostat_report, sep='\t')
         log_file.write("NanoStat report loaded successfully.\n")
 
         nanostat_df.set_index('Metrics',inplace=True)
         nanostat_df = nanostat_df.transpose()
-        int(float(nanostat_df['number_of_bases'].values[0]))
+#        int(float(nanostat_df['number_of_bases'].values[0]))
 
         stats = {
             "total_bases": int(float(nanostat_df['number_of_bases'].values[0])),

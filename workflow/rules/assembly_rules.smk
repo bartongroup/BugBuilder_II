@@ -15,18 +15,19 @@ rule spades:
     params:
         mode = lambda wildcards, input: get_spades_mode(wildcards, config, input)
     shell: """
-        (cp -v {input.fq1} $TMPDIR/{wildcards.sample}_1.fastq.gz &&
-        cp -v {input.fq2} $TMPDIR/{wildcards.sample}_2.fastq.gz &&
+        exec > {log} 2>&1
+        cp -v {input.fq1} $TMPDIR/{wildcards.sample}_1.fastq.gz
+        cp -v {input.fq2} $TMPDIR/{wildcards.sample}_2.fastq.gz
         spades.py \
             -1 $TMPDIR/{wildcards.sample}_1.fastq.gz \
             -2 $TMPDIR/{wildcards.sample}_2.fastq.gz \
             {params.mode} \
             -t {threads} \
             -m {resources.mem_mb} \
-            -o $TMPDIR/spades_output &&
-        cp -v $TMPDIR/spades_output/contigs.fasta {output.contigs} &&
-        cp -v $TMPDIR/spades_output/assembly_graph_with_scaffolds.gfa {output.gfa} ) \
-        > {log} 2>&1 
+            -o $TMPDIR/spades_output
+        cp -v $TMPDIR/spades_output/contigs.fasta {output.contigs}
+        cp -v $TMPDIR/spades_output/assembly_graph_with_scaffolds.gfa {output.gfa}
+        ln -sfv short_assembly/{wildcards.sample}.fasta results/assembly/{wildcards.sample}.fasta 
     """
 
 rule flye:
@@ -45,17 +46,17 @@ rule flye:
     params:
         genome_size = config['genome_size']
     shell: """
-        (cp -v {input.fastq} $TMPDIR &&
+        exec > {log} 2>&1
+        cp -v {input.fastq} $TMPDIR 
         flye \
             --nano-hq $TMPDIR/{wildcards.sample}.fastq.gz \
             --out-dir $TMPDIR/flye \
             --genome-size {params.genome_size} \
             --asm-coverage 50 \
-            --threads {threads} &&
-        cp -v $TMPDIR/flye/assembly.fasta {output.assembly} &&
-        cp -v $TMPDIR/flye/assembly_graph.gfa {output.gfa} &&
-        cp -v $TMPDIR/flye/assembly_info.txt {output.info} ) \
-        > {log} 2>&1
+            --threads {threads}
+        cp -v $TMPDIR/flye/assembly.fasta {output.assembly}
+        cp -v $TMPDIR/flye/assembly_graph.gfa {output.gfa}
+        cp -v $TMPDIR/flye/assembly_info.txt {output.info}
     """
 
 rule unicycler:
@@ -73,11 +74,16 @@ rule unicycler:
     resources:
         mem_mb = 1 # overidden by profile config, but required... 
     shell:"""
-        ( mkdir $TMPDIR/reads &&
-        cp -v {input.short_fq1} $TMPDIR/reads/{wildcards.sample}_1.fastq.gz &&
-        cp -v {input.short_fq2} $TMPDIR/reads/{wildcards.sample}_2.fastq.gz &&
-        cp -v {input.long_fq} $TMPDIR/reads/{wildcards.sample}.fastq.gz &&
-        cp -v {input.flye_contigs} $TMPDIR/reads/flye.fasta &&
+        exec > {log} 2>&1
+        echo "Running Unicycler for sample {wildcards.sample}"
+        echo "Short reads: {input.short_fq1} and {input.short_fq2}"
+        echo "Long reads: {input.long_fq}" 
+        echo "Flye assembly: {input.flye_contigs}"
+        mkdir $TMPDIR/reads 
+        cp -v {input.short_fq1} $TMPDIR/reads/{wildcards.sample}_1.fastq.gz 
+        cp -v {input.short_fq2} $TMPDIR/reads/{wildcards.sample}_2.fastq.gz 
+        cp -v {input.long_fq} $TMPDIR/reads/{wildcards.sample}.fastq.gz 
+        cp -v {input.flye_contigs} $TMPDIR/reads/flye.fasta 
         unicycler \
             -1 $TMPDIR/reads/{wildcards.sample}_1.fastq.gz \
             -2 $TMPDIR/reads/{wildcards.sample}_2.fastq.gz \
@@ -85,8 +91,8 @@ rule unicycler:
             --existing_long_read_assembly $TMPDIR/reads/flye.fasta \
             -t {threads} \
             --mode bold \
-            -o $TMPDIR/output &&
-        cp -v $TMPDIR/output/assembly.fasta {output.contigs} &&
-        cp -v $TMPDIR/output/assembly.gfa {output.gfa} ) \
-        > {log} 2>&1
+            -o $TMPDIR/output 
+        cp -v $TMPDIR/output/assembly.fasta {output.contigs} 
+        cp -v $TMPDIR/output/assembly.gfa {output.gfa}
+        ln -sfv long_assembly/{wildcards.sample}.fasta results/assembly/{wildcards.sample}.fasta
     """

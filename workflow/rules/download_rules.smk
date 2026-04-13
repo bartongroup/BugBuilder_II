@@ -40,9 +40,9 @@ rule amrfinder_download:
     log: 'workflow/logs/amrfinder_db_download.log'
     container: containers["bakta"]
     shell:"""
-    amrfinder_update --database {params.database_path}/bakta_db/amrfinderplus-db/ \
-        > {log} 2>&1
-    echo "exit status: $?" >> {log}
+    exec > {log} 2>&1
+    amrfinder_update --database {params.database_path}/bakta_db/amrfinderplus-db/ 
+    echo "exit status: $?" 
 """
 
 rule gtdb_download:
@@ -53,12 +53,11 @@ rule gtdb_download:
         gtdb_version = config['gtdb_version']
     log: 'workflow/logs/gtdb_download.log'
     shell: """
-(
-export PYTHONPATH=workflow/scripts
-workflow/scripts/download_gtdbtk_db.py \
-    --database_dir {params.database_path} \
-    --database_version {params.gtdb_version} \
- ) > {log} 2>&1
+    export PYTHONPATH=workflow/scripts
+    workflow/scripts/download_gtdbtk_db.py \
+        --database_dir {params.database_path} \
+        --database_version {params.gtdb_version} \
+    > {log} 2>&1
 """
 
 rule busco_download:
@@ -69,10 +68,10 @@ rule busco_download:
         database_version = config['busco_dataset']
     log: 'workflow/logs/busco_download.log'
     shell: """
-export PYTHONPATH=workflow/scripts
-workflow/scripts/download_busco_lineages.py \
-  --database_dir {params.database_path} \
-  --database_version {params.database_version} \
+    export PYTHONPATH=workflow/scripts
+    workflow/scripts/download_busco_lineages.py \
+        --database_dir {params.database_path} \
+        --database_version {params.database_version} \
   > {log} 2>&1
 touch {output}
 """
@@ -85,9 +84,9 @@ rule checkm2_download:
         database_version = config['checkm2_db_version']
     log: 'workflow/logs/checkm2_download.log'
     shell: """
-export PYTHONPATH=workflow/scripts
-workflow/scripts/download_checkm2_db.py \
-  --database_dir {params.database_path} \
-  --database_version {params.database_version} \
-  > {log} 2>&1
+    export PYTHONPATH=workflow/scripts
+    workflow/scripts/download_checkm2_db.py \
+        --database_dir {params.database_path} \
+        --database_version {params.database_version} \
+    > {log} 2>&1
 """

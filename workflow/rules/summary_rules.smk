@@ -62,7 +62,7 @@ rule manifest:
         quast = "results/quast/{sample}/report.tsv"
     output: "results/manifests/{sample}_manifest.tsv"
     params: 
-        nanostat = "results/long_read_stats/{sample}_trimmed_nanostat.txt",
+        nanostat = "results/long_read_stats/{sample}_trimmed_nanostat.txt"
     log: 'workflow/logs/manifest_{sample}.log'
     run:
         short_bases = 0
@@ -76,7 +76,7 @@ rule manifest:
         fastp_stats = get_fastp_stats(input.fastp, log)
         short_bases = fastp_stats['total_bases']
 
-        if get_assembly_type(wildcards) == "long":
+        if wildcards.sample in LONG_SAMPLES:
             nanostat_stats = get_nanostat_stats(params.nanostat, log)
             long_bases = nanostat_stats['total_bases']
             program = 'flye, unicycler'
@@ -86,6 +86,9 @@ rule manifest:
         samples_file = Path('workflow/config/samples.csv')
         runs_file = Path('workflow/config/runs.csv')
 
+        sample_id = 'Unknown'
+        run_id = 'Unknown'
+
         if samples_file.exists() and runs_file.exists():
             samples_df = pd.read_csv(samples_file)
             runs_df = pd.read_csv(runs_file)
@@ -94,7 +97,7 @@ rule manifest:
 
             sample_id = sample_info['id_samples'].values[0] if not sample_info.empty else None
             run_id = ','.join(sample_info['id_runs'].values) if not sample_info.empty else None
-
+        
         # Combine into manifest
         manifest_df = pd.DataFrame({
             'STUDY': [config['project_id']],

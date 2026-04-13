@@ -99,18 +99,22 @@ rule kraken:
     output: 
         output = 'results/kraken2/{sample}_kraken_output.txt',
         report = 'results/kraken2/{sample}_kraken_report.txt'
+    params:
+        db_path = config['database_path'] + "/kraken2"
     container: containers["kraken2"]
     log: 'workflow/logs/kraken2_{sample}.log'
     threads: 1 # overidden by profile config, but required...
     shell: """
+    exec > {log} 2>&1
+    echo "Running Kraken2 for sample {wildcards.sample} with database {params.db_path}"
     k2 classify \
-        --db databases/kraken2/ \
+        --db {params.db_path} \
         --threads {threads} \
         --memory-mapping \
         --use-names \
         --output {output.output} \
         --report {output.report} \
         --paired \
-        {input.r1} {input.r2} > {log} 2>&1
+        {input.r1} {input.r2}
     """
 

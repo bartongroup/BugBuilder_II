@@ -1,7 +1,7 @@
 # Rules for post-assembly analyses, including annotation with bakta, blast
 # database formatting, GTDB-Tk classification, CheckM2 quality assessment, and
 # QUAST assembly quality assessment
-print("short samples:", SHORT_SAMPLES)
+
 rule bakta:
     input: 
         contigs = lambda wildcards: get_assembly_path(wildcards, SHORT_SAMPLES),
@@ -16,6 +16,7 @@ rule bakta:
         gram=config['gram']
     threads: 1 # overidden by profile config, but required...
     shell:"""
+        exec > {log} 2>&1
         bakta \
         --db {params.database_path}/bakta_db/ \
         --prefix {wildcards.sample} \
@@ -26,7 +27,7 @@ rule bakta:
         --locus-tag {wildcards.sample} \
         --gram {params.gram} \
         --force \
-        {input.contigs} > {log} 2>&1
+        {input.contigs}
 """
 
 rule blast_format:
@@ -39,6 +40,7 @@ rule blast_format:
     container: containers["blast"]
     log: 'workflow/logs/blast_format_{sample}.log'
     shell: """
+        exec > {log} 2>&1
         cat {input.genome} |  sed -E 's/(contig_[0-9]*).*/{wildcards.sample}|\\1/' > \
             results/blast_db/genome/{wildcards.sample}
         cp {input.protein} results/blast_db/protein/{wildcards.sample}
@@ -46,14 +48,12 @@ rule blast_format:
         makeblastdb \
             -in results/blast_db/genome/{wildcards.sample} \
             -dbtype nucl \
-            -out results/blast_db/genome/{wildcards.sample} \
-            > {log} 2>&1
+            -out results/blast_db/genome/{wildcards.sample} 
 
         makeblastdb \
             -in results/blast_db/protein/{wildcards.sample} \
             -dbtype prot \
-            -out results/blast_db/protein/{wildcards.sample} \
-            > {log} 2>&1
+            -out results/blast_db/protein/{wildcards.sample} 
     """
 
 rule combined_blast_db:
@@ -64,6 +64,7 @@ rule combined_blast_db:
     container: containers["blast"]
     log: 'workflow/logs/combined_blast_db.log'
     shell: """
+    exec > {log} 2>&1
     ls results/blast_db/genome|grep -v \\\\. | \
         sed 's|^|results/blast_db/genome/|' > $TMPDIR/genome_samples.txt
 
@@ -74,13 +75,11 @@ rule combined_blast_db:
         -dbtype nucl \
         -title "Combined Genomic Assemblies" \
         -out results/blast_db/assemblies
-        >> {log} 2>&1
 
     blastdb_aliastool -dblist_file $TMPDIR/protein_samples.txt \
         -dbtype prot \
         -title "Combined Protein Predictions" \
         -out results/blast_db/assemblies
-        >> {log} 2>&1
     """
 
 
@@ -96,17 +95,17 @@ rule gtdbtk:
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/gtdbtk.log'
     shell: """
-export GTDBTK_DATA_PATH="{params.database_path}/gtdbtk"
-echo "Running GTDB-Tk classification workflow with GTDBTK_DATA_PATH=$GTDBTK_DATA_PATH"
-gtdbtk classify_wf \
+    exec > {log} 2>&1
+    export GTDBTK_DATA_PATH="{params.database_path}/gtdbtk" 
+    echo "Running GTDB-Tk classification workflow with GTDBTK_DATA_PATH=$GTDBTK_DATA_PATH" 
+    gtdbtk classify_wf \
         --genome_dir results/assembly \
         --out_dir results/gtdbtk/ \
         -x fasta \
         --cpus {threads} \
         --pplacer_cpus {threads} \
         --tmpdir $TMPDIR \
-        --force \
-        > {log} 2>&1
+        --force 
 """
 
 rule busco:
@@ -119,10 +118,17 @@ rule busco:
     container: containers["busco"]
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/busco_{sample}.log'
-    shell: """
-    cp -v {input.assembly} $TMPDIR/assembly.fasta 
-    current_dir=$(pwd) 
-    cd $TMPDIR
+    # raw string used to preserve \; in find command
+    shell: r"""
+    LOG_ABS=$(readlink -f {log})
+    OUT_ABS=$(readlink -f {output})
+    
+    exec > "$LOG_ABS" 2>&1  
+    echo "Running BUSCO for sample {wildcards.sample} with assembly {input.assembly}" 
+
+    cp -v {input.assembly} $TMPDIR/assembly.fasta
+    cd $TMPDIR 
+
     busco -m genome \
         -c {threads} \
         --auto-lineage-prok \
@@ -130,9 +136,8 @@ rule busco:
         --out_path $TMPDIR \
         -o {wildcards.sample} \
         -i assembly.fasta \
-        -f >> $current_dir/{log} 2>&1
-        result=$(ls -rt $TMPDIR/{wildcards.sample}/*.txt|tail -1)
-        cp -v $result $current_dir/{output} >> $current_dir/{log} 2>&1
+        -f 
+        find "{wildcards.sample}" -name "short_summary*.txt" -exec cp -v {{}} "$OUT_ABS" \;
 """
 
 rule checkm2: 
@@ -144,20 +149,23 @@ rule checkm2:
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/checkm2_{sample}.log'
     shell: """
+    exec > "{log}" 2>&1
+    echo "Running CheckM2 for sample {wildcards.sample} with assembly {input.assembly}" 
     checkm2 predict \
         --input {input.assembly} \
         --output_dir results/checkm2/{wildcards.sample} \
         --database {input.database} \
         --threads {threads} \
         --force \
-        --tmpdir $TMPDIR \
-        > {log} 2>&1
+        --tmpdir $TMPDIR
 """
 
 rule quast:
     input: 
         short_fq1 = 'results/trimmed_short_reads/{sample}_1.fastq.gz',
         short_fq2 = 'results/trimmed_short_reads/{sample}_2.fastq.gz',
+        bakta = 'results/annotated/{sample}/{sample}.gff3',
+        busco = 'results/busco/short_summary_{sample}.txt',
         assembly = lambda wildcards: get_assembly_path(wildcards, SHORT_SAMPLES)
     output: "results/quast/{sample}/report.tsv"
     params:
@@ -167,12 +175,14 @@ rule quast:
     threads: 1 # overidden by profile config, but required...
     log: 'workflow/logs/quast_{sample}.log'
     shell: """
-        mkdir $TMPDIR/reads
+        exec > "{log}" 2>&1  
+        echo "Running QUAST for sample {wildcards.sample} with assembly {input.assembly}" 
+        mkdir $TMPDIR/reads 
         cp {input.short_fq1} $TMPDIR/reads/{wildcards.sample}_1.fastq.gz
         cp {input.short_fq2} $TMPDIR/reads/{wildcards.sample}_2.fastq.gz
 
-        job_args=""
-        if [ -f {params.long_fq} ]; then
+        job_args="" 
+        if [ -f {params.long_fq} ]; then 
             cp -v {params.long_fq} $TMPDIR/reads/{wildcards.sample}.fastq.gz
             job_args="--nanopore $TMPDIR/reads/{wildcards.sample}.fastq.gz"
         fi
@@ -187,5 +197,5 @@ rule quast:
         -o results/quast/{wildcards.sample} \
         --threads {threads} \
         --no-html \
-        {input.assembly} > {log} 2>&1
+        {input.assembly} 
 """
