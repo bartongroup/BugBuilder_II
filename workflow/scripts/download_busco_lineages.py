@@ -166,7 +166,7 @@ def download_information(database_dir, url):
         raise ValueError(f"No information files found at {info_url}")
 
     for file in information_files:
-        local_info_file = information_dir / Path(file).name
+        local_info_file = information_dir / Path(str(file)).name
         download_file(info_url, local_info_file)
 
 def download_placement_files(database_dir, database_version, url):
@@ -192,7 +192,7 @@ def download_placement_files(database_dir, database_version, url):
         raise ValueError(f"No placement files found at {placement_url} for version {database_version}")
 
     for file in placement_files:
-        local_placement_file = placement_dir / Path(file).name
+        local_placement_file = placement_dir / Path(str(file)).name
         download_file(placement_url, local_placement_file)
 
 
