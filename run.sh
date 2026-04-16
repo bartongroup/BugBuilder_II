@@ -35,5 +35,5 @@ if [[ $? -ne 0 ]]; then
 	exit 1
 fi
 
-echo "\nRunning Snakemake workflow..."
+echo -e "\nRunning Snakemake workflow..."
 snakemake --profile profile $@

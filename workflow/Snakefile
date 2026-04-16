@@ -6,7 +6,8 @@ import sys
 
 from scripts.common.helpers import get_spades_mode, get_assembly_path, \
     get_assembly_type
-from scripts.common.assembly_stats import get_quast_stats, get_fastp_stats, get_nanostat_stats
+from scripts.common.assembly_stats import get_quast_stats, get_all_quast_stats, \
+    get_fastp_stats, get_nanostat_stats, get_checkm2_stats, extract_RNA_seqs
 
 configfile: "workflow/config/config.yaml"
 

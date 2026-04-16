@@ -39,6 +39,7 @@ QUASTS  = expand("results/quast/{sample}/report.tsv",sample=SAMPLES)
 MULTIQC_REPORT = ['workflow/reports/multiqc_report.html']
 
 MANIFESTS = expand("results/manifests/{sample}_manifest.tsv", sample=SAMPLES)
+RNA_REPR = ['results/rna_representation_mqc.tsv']
 
 OUTPUTS = ANNOTS + BLAST_ALIAS_DBS + BUSCOS + GTDBTK + QUASTS + \
-    CHECKMS + FASTQC_OUTPUTS + MULTIQC_REPORT + MANIFESTS
+    CHECKMS + FASTQC_OUTPUTS + MULTIQC_REPORT + RNA_REPR + MANIFESTS

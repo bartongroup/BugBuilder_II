@@ -1,5 +1,4 @@
-# Rules for summarising results, including software versions and MultiQC report generation
-
+# Rules for summarising results, including software versions and MultiQC report generation import pandas as pd
 rule software_versions:
     input: f"{config['database_path']}/db_versions.json"
     output: 'results/software_mqc_versions.yaml'
@@ -36,12 +35,32 @@ rule software_versions:
 
                     f.write(f"{name}: '{version}'\n")
 
+rule summary_tables:
+    input:
+        quast = expand("results/quast/{sample}/report.tsv",sample=SAMPLES),
+        busco = expand('results/busco/short_summary_{sample}.txt', sample=SAMPLES),
+        checkm2 = expand("results/checkm2/{sample}/quality_report.tsv", sample=SAMPLES),
+        bakta = expand('results/annotated/{sample}/{sample}.ffn', sample=SAMPLES)
+    output: 
+        rna_representation = 'results/rna_representation_mqc.tsv',
+    log: 'workflow/logs/summary_tables.log'
+    run: 
+        rna_stats    = extract_RNA_seqs('results/annotated', log)
+        quast_stats  = get_all_quast_stats(input.quast, log) 
+        checkm_stats = get_checkm2_stats(input.checkm2, log)
+
+        rna_stats.to_csv(output.rna_representation, sep='\t', index_label='SAMPLE')
+        all_stats = quast_stats.join([checkm_stats, rna_stats], how='outer')
+
+        all_stats.to_csv('results/assembly_stats.tsv', sep='\t', index_label='SAMPLE')
+
+
 rule multiqc:
     input:
         files = expand('results/trimmed_short_reads/{sample}_fastp.json', sample=SAMPLES) +
                 expand('results/long_read_stats/{sample}_nanostat.txt', sample=LONG_SAMPLES) +
                 FASTQC_OUTPUTS + KRAKEN_REPORTS + ANNOTS + GTDBTK + CHECKMS + BUSCOS + QUASTS + 
-                ['results/software_mqc_versions.yaml'],
+                ['results/software_mqc_versions.yaml', 'results/rna_representation_mqc.tsv'],
         config = 'etc/multiqc.conf'
     output:
         'workflow/reports/multiqc_report.html'
