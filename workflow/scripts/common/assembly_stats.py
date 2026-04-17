@@ -180,7 +180,7 @@ def extract_trna_amino_acid(tRNA_string):
         The amino acid associated with the tRNA, e.g. "Met"
     """
     # Regex searches for text between 'tRNA-' and either a digit or '('
-    match = re.search(r'tRNA-([a-zA-Z]+)', tRNA_string)
+    match = re.search(r'tRNA-([a-zA-Z2]+)', tRNA_string)
     if match:
         aa = match.group(1)
         return aa
