@@ -25,6 +25,9 @@ fi
 # to help with sharing databases and apptainer caches
 umask 002
 
+export APPTAINER_CACHEDIR=$(python3 -c "import yaml; print(yaml.safe_load(open('workflow/config/config.yaml'))['apptainer_cache'])")
+export SNAKEMAKE_CONTAINER_CACHE=$APPTAINER_CACHEDIR
+
 # Firstly pull the apptainer images to make sure they download successfully
 # allowing us to generate a sensible error message...
 echo "Pulling required apptainer images..."

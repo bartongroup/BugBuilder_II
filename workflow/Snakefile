@@ -14,6 +14,10 @@ configfile: "workflow/config/config.yaml"
 containers = config['containers']
 apptainer_cache = config.get("apptainer_cache")
 
+envvars:
+    "APPTAINER_CACHEDIR",
+    "SNAKEMAKE_CONTAINER_CACHE"
+
 if apptainer_cache:
     cache_path = os.path.abspath(os.path.expanduser(apptainer_cache))
     os.makedirs(cache_path, exist_ok=True)
@@ -22,9 +26,6 @@ if apptainer_cache:
         os.chmod(cache_path, 0o2777)
     except PermissionError:
         print(f"Warning: Could not set permissions on {cache_path}")
-    
-    os.environ["APPTAINER_CACHEDIR"] = cache_path
-    os.environ["SNAKEMAKE_CONTAINER_CACHE"] = cache_path
 
 include: "rules/samples_variables.smk"
 include: "rules/database_variables.smk"
