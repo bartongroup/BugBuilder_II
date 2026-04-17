@@ -111,7 +111,6 @@ def get_nanostat_stats(nanostat_report, log):
         log_file.write(f"Extracting NanoStat stats from {nanostat_report}\n")
 
         nanostat_df = pd.read_csv(nanostat_report, sep='\t')
-        print(nanostat_df)
         log_file.write("NanoStat report loaded successfully.\n")
 
         nanostat_df.set_index('Metrics',inplace=True)
@@ -165,7 +164,6 @@ def get_checkm2_stats(checkm2_reports, log):
                 log_file.write(f"{key}: {value}\n")
 
         all_stats_df = pd.DataFrame.from_dict(all_stats, orient='index')
-        print(all_stats_df)
 
         return all_stats_df
 
@@ -247,7 +245,7 @@ def extract_RNA_seqs(bakta_dir, log):
             RNA_counts['tRNAs (total)'] = len(tRNAs)
             tRNAs = list(set(tRNAs))  # Get unique tRNA types
             RNA_counts['tRNAs (unique)'] = len(tRNAs)
-            print(tRNAs)
+
             AAs = [extract_trna_amino_acid(tRNA) for tRNA in tRNAs]
             RNA_counts['tRNA amino acids'] = len(sorted(set(AAs))) 
 
@@ -264,3 +262,24 @@ def extract_RNA_seqs(bakta_dir, log):
                 SeqIO.write(sequences, rRNA_fasta, "fasta")
         
         return rna_stats_df
+
+def assign_status(row):
+    """
+    Assigns a status of 'High Quality', 'Medium Quality' or 'Low Quality' to a
+    genome based on its CheckM2 completeness and contamination values. and RNA
+    represetntation
+
+    Required parameters:
+        row: Row from dataframe containing assembly statistics for genome
+
+    Returns:
+        A string indicating the quality status of the genome
+    """
+    if row['completeness'] >= 90 and row['contamination'] <= 5 \
+        and row['16S_rRNA'] >= 1 and row['23S_rRNA'] >= 1 \
+            and row['5S_rRNA'] >= 1 and row['tRNAs (unique)'] >= 18:
+        return 'High Quality'
+    elif row['completeness'] >= 50 and row['contamination'] <= 10:
+        return 'Medium Quality'
+    else:
+        return 'Low Quality'

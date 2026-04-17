@@ -43,6 +43,7 @@ rule summary_tables:
         bakta = expand('results/annotated/{sample}/{sample}.ffn', sample=SAMPLES)
     output: 
         rna_representation = 'results/rna_representation_mqc.tsv',
+        assembly_stats = 'results/assembly_stats.tsv'
     log: 'workflow/logs/summary_tables.log'
     run: 
         rna_stats    = extract_RNA_seqs('results/annotated', log)
@@ -51,6 +52,7 @@ rule summary_tables:
 
         rna_stats.to_csv(output.rna_representation, sep='\t', index_label='SAMPLE')
         all_stats = quast_stats.join([checkm_stats, rna_stats], how='outer')
+        all_stats['Status'] = all_stats.apply(lambda row: assign_status(row), axis=1)
 
         all_stats.to_csv('results/assembly_stats.tsv', sep='\t', index_label='SAMPLE')
 
