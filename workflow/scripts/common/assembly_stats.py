@@ -239,15 +239,15 @@ def extract_RNA_seqs(bakta_dir, log):
                     rRNA_sequences['5S_rRNA'].append(record)
 
                 # tRNA regex looks for 'tRNA-' followed by an optional lowercase
-                # letter (for fMet or Ile2), then an uppercase letter, then three
-                # lowercase letters (for the amino acid)
-                elif re.search(r'tRNA-[a-z]?[A-Z][a-z]{2}', description):
+                # letter (for fMet), then an uppercase letter, then three
+                # lowercase letters (for the amino acid), with an optional '2' for Ile2 
+                elif re.search(r'tRNA-[f]?[A-Z][a-z]{2}[2]?', description):
                     tRNAs.append(description)
 
             RNA_counts['tRNAs (total)'] = len(tRNAs)
             tRNAs = list(set(tRNAs))  # Get unique tRNA types
             RNA_counts['tRNAs (unique)'] = len(tRNAs)
-
+            print(tRNAs)
             AAs = [extract_trna_amino_acid(tRNA) for tRNA in tRNAs]
             RNA_counts['tRNA amino acids'] = len(sorted(set(AAs))) 
 
