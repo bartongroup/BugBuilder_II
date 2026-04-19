@@ -1,6 +1,7 @@
 snakefile: workflow/Snakefile
 software-deployment-method: apptainer
-apptainer-args: "--bind /cluster/gjb_lab/jabbott/Projects/BugBuilder_II/databases"
+# apptainer args path must include trailing slash...
+apptainer-args: "--bind /cluster/gjb_lab/jabbott/Projects/BugBuilder_II/databases/"
 latency-wait: 60
 show-failed-logs: True
 keep-going: False

@@ -7,6 +7,7 @@ rule kraken_db_download:
         database_path = config['database_path'],
         kraken_db_version = config['kraken_db_version'],
         kraken_db_type = config['kraken_db_type']
+    container: containers["bugbuilder_ii"]
     log: 'workflow/logs/kraken_db_download.log'
     shell:"""
 export PYTHONPATH=workflow/scripts
@@ -24,6 +25,7 @@ rule bakta_download:
         database_version = config['bakta_db_version'],
         database_type    = config['bakta_db_type']
     log: 'workflow/logs/bakta_db_download.log'
+    container: containers["bugbuilder_ii"]
     shell:"""
 export PYTHONPATH=workflow/scripts
 workflow/scripts/download_bakta_db.py \
@@ -51,6 +53,7 @@ rule gtdb_download:
     params:
         database_path = config['database_path'],
         gtdb_version = config['gtdb_version']
+    container: containers["bugbuilder_ii"]
     log: 'workflow/logs/gtdb_download.log'
     shell: """
     export PYTHONPATH=workflow/scripts
@@ -66,6 +69,7 @@ rule busco_download:
     params:
         database_path = config['database_path'],
         database_version = config['busco_dataset']
+    container: containers["bugbuilder_ii"]
     log: 'workflow/logs/busco_download.log'
     shell: """
     export PYTHONPATH=workflow/scripts
@@ -82,6 +86,7 @@ rule checkm2_download:
     params:
         database_path = config['database_path'],
         database_version = config['checkm2_db_version']
+    container: containers["bugbuilder_ii"]
     log: 'workflow/logs/checkm2_download.log'
     shell: """
     export PYTHONPATH=workflow/scripts

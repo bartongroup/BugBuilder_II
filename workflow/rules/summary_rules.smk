@@ -7,7 +7,7 @@ rule software_versions:
     log: 'workflow/logs/software_versions.log'
     run:
         with open(log[0], 'w') as log_file:
-            json_file = params.database_path + "/db_versions.json"
+            json_file = f'{params.database_path}/db_versions.json'
             print(f"Collecting software versions from file: {json_file}", file=log_file)
 
             with open(f'{params.database_path}/db_versions.json') as f:

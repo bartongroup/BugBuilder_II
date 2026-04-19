@@ -100,7 +100,7 @@ rule kraken:
         output = 'results/kraken2/{sample}_kraken_output.txt',
         report = 'results/kraken2/{sample}_kraken_report.txt'
     params:
-        db_path = config['database_path'] + "/kraken2"
+        db_path = f"{config['database_path']}/kraken2"
     container: containers["kraken2"]
     log: 'workflow/logs/kraken2_{sample}.log'
     threads: 1 # overidden by profile config, but required...
