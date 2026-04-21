@@ -16,13 +16,13 @@ import requests
 
 from requests.adapters import HTTPAdapter, Retry
 
-from common.download import init_worker, download_file, make_request, update_db_version
+from common.download import download_file_parallel, make_request, update_db_version
+
+BASE_URL = "https://data.gtdb.aau.ecogenomic.org/releases/"
 
 def get_latest_release(release):
 
-    url = "https://data.gtdb.aau.ecogenomic.org/releases/"
-
-    result = make_request(url)
+    result = make_request(BASE_URL)
     if result:
         soup = BeautifulSoup(result, 'html.parser')
 
@@ -38,39 +38,6 @@ def get_latest_release(release):
     
     raise RuntimeError("Failed to retrieve GTDB-TK releases from GTDB website.")
 
-def get_gtdbtk_part_list(release):
-
-    """
-    Retrieves data on separate tar sections for gtdbtk database
-
-    Required arguments:
-        release(str): GTDB database release number
-
-    Returns:
-        uris(list): URIs of tar sections
-    """
-
-    base_url = "https://data.gtdb.ecogenomic.org/releases"
-    release_path = f"release{release}/{release}.0"
-    package_path = "auxillary_files/gtdbtk_package/split_package/"
-
-    uri = f"{base_url}/{release_path}/{package_path}"
-
-    html = make_request(uri)
-    if html is not None:
-        soup = BeautifulSoup(html, features='lxml')
-
-    links = []
-    for link in soup.find_all('a', href=True):
-        href = link['href']
-
-        if isinstance(href, str) and href.startswith('gtdb'):
-            print(f"Found link: {link.get('href')}")
-            part_uri = uri + href
-            links.append(part_uri)
-
-    return links
-
 def unpack(database_dir, download_dir, release):
     """ 
     Combines separate parts into single tar archive and unpacks 
@@ -83,19 +50,8 @@ def unpack(database_dir, download_dir, release):
     Returns:
         None
     """
-    print(f"Looking for split files in {download_dir} with pattern gtdbtk_r{release}_data.tar.gz.part*")
-    print(f"Files found: {list(download_dir.glob(f'gtdbtk_r{release}_data.tar.gz.part*'))}")
 
-    parts = [str(p) for p in sorted(download_dir.glob(f"gtdbtk_r{release}_data.tar.gz.part*"))]
-    if not parts:
-        raise RuntimeError("No split files found.")
-    cmd = ['cat'] + parts
-
-    print(f"Combining parts into single archive: {' '.join(cmd)}")
-    with open(f"{download_dir}/gtdbtk_r{release}_data.tar.gz", 'wb') as fh:
-       subprocess.run(cmd, check=True, stdout = fh)
-
-    print(f"Unpacking combined archive: {download_dir}/gtdbtk_r{release}_data.tar.gz")
+    print(f"Unpacking archive: {download_dir}/gtdbtk_r{release}_data.tar.gz")
     with tarfile.open(f"{download_dir}/gtdbtk_r{release}_data.tar.gz", "r") as handle:
         handle.extractall(path=f"{download_dir}/")
 
@@ -144,16 +100,14 @@ def main():
     except FileExistsError as e:
         print(e)
 
-    links = get_gtdbtk_part_list(release)
-    print(f"Found {len(links)} parts to download")
+    download_url = f"{BASE_URL}/release{release}/{release}.0/auxillary_files/gtdbtk_package/full_package/gtdbtk_r{release}_data.tar.gz"
+    print(f"Downloading GTDB-TK database from {download_url} to {download_dir}")    
 
-    session = None
+    download_file_parallel(download_url, download_dir / f"gtdbtk_r{release}_data.tar.gz", number_of_threads=16)
 
-    with multiprocessing.Pool(initializer=init_worker, processes=18) as pool:
-        results = pool.starmap(download_file, [(url,  f"{download_dir}/{url.split('/')[-1]}") for url in links])
-
-    pool.close()
-    pool.join()
+    if Path(database_dir).exists():
+        print(f"Removing existing GTDB-TK database directory: {database_dir}")
+        shutil.rmtree(database_dir)
 
     unpack(database_dir, download_dir, release)
 

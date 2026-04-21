@@ -144,6 +144,7 @@ def download_file_parallel(url_of_file, name, number_of_threads):
     """
 
     r = requests.head(url_of_file)
+    print(r.headers)
     
     if name:
         file_name = name
@@ -156,6 +157,7 @@ def download_file_parallel(url_of_file, name, number_of_threads):
         print("Invalid URL or missing Content-Length header.")
         return
 
+    print("File size: ", file_size, " bytes")
     part = file_size // number_of_threads
     with open(file_name, "wb") as fp:
         fp.truncate(file_size)
